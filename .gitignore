@@ -2,3 +2,7 @@ node_modules/
 .env
 dist/
 build/
+chroma/
+chroma_db/
+chromadb/
+*.sqlite3
