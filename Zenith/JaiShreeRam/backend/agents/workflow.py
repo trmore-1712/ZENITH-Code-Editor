@@ -374,8 +374,10 @@ class EditState(TypedDict):
 class MultiFileEditWorkflow:
     """Orchestrates multi-file edits with AST analysis and planning"""
 
-    def __init__(self, llm_service):
+    def __init__(self, llm_service, rag_service=None, tree_sitter_service=None):
         self.llm_service = llm_service
+        self.rag_service = rag_service
+        self.tree_sitter_service = tree_sitter_service
         self.workflow = self._create_workflow()
 
     def _create_workflow(self):
@@ -393,11 +395,48 @@ class MultiFileEditWorkflow:
         return workflow.compile()
 
     def _analyze_context(self, state: EditState) -> EditState:
-        """Analyze files using AST/Regex to understand context"""
+        """Analyze files using RAG for discovery and AST/Regex for structure"""
         logger.info("Analyzing context for multi-file edit")
         
+        # 1. RAG Discovery (Hybrid Strategy)
+        discovered_files = set(state.get("files", []))
+        rag_context = ""
+        
+        if self.rag_service:
+            try:
+                # Infer relevant files from the task even if not explicitly mentioned
+                logger.info(f"Querying RAG for task: {state['task']}")
+                search_result = self.rag_service.query_with_context(state['task'])
+                rag_context = search_result.get("context", "")
+                
+                # Extract filenames from RAG content (File: ...) logic or sources
+                for source in search_result.get("sources", []):
+                    # Only add if it's a file in the project (rag sources are usually relative paths or filenames)
+                    if source and source != "unknown":
+                         # Heuristic: if it looks like a file path, add it
+                         # Sources from rag_service are usually filenames
+                         import os
+                         if os.path.exists(source) or (self.rag_service.current_indexed_path and os.path.exists(os.path.join(self.rag_service.current_indexed_path, source))):
+                             if self.rag_service.current_indexed_path and not os.path.isabs(source):
+                                 full_path = os.path.join(self.rag_service.current_indexed_path, source)
+                                 discovered_files.add(full_path)
+                             else:
+                                 discovered_files.add(source)
+                                 
+                logger.info(f"RAG discovered files: {discovered_files}")
+                
+            except Exception as e:
+                logger.error(f"RAG discovery failed: {e}")
+
+        # Update state with discovered files so subsequent steps see them
+        state["files"] = list(discovered_files)
+
+        # 2. Structure Analysis (AST/Content/Tree-sitter)
         analysis_results = []
-        import ast
+        if rag_context:
+            analysis_results.append("--- RAG Context (Relevant Snippets) ---")
+            analysis_results.append(rag_context + "\n")
+
         import os
         
         for file_path in state.get("files", []):
@@ -410,16 +449,18 @@ class MultiFileEditWorkflow:
                 
                 analysis_results.append(f"--- File: {os.path.basename(file_path)} ---")
                 
-                if file_path.endswith(".py"):
-                    try:
-                        tree = ast.parse(content)
-                        classes = [node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
-                        functions = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
-                        analysis_results.append(f"Structure: Classes={classes}, Functions={functions}")
-                    except SyntaxError:
-                        analysis_results.append("Structure: (Syntax Error)")
+                # Use Tree-sitter if available
+                if self.tree_sitter_service:
+                    structure = self.tree_sitter_service.parse_file(file_path, content)
+                    if "error" in structure:
+                         analysis_results.append(f"Structure: (Error: {structure['error']})")
+                    else:
+                         analysis_results.append(f"Structure: Language={structure.get('language')}")
+                         analysis_results.append(f"Classes={structure.get('classes', [])}")
+                         analysis_results.append(f"Functions={structure.get('functions', [])}")
                 else:
-                    analysis_results.append("Structure: (Non-Python file)")
+                    # Fallback (Simple read) or old AST logic if desired, but we are replacing it.
+                    analysis_results.append("Structure: (Tree-sitter not available)")
                     
             except Exception as e:
                 logger.error(f"Error analyzing file {file_path}: {e}")
@@ -458,6 +499,8 @@ class MultiFileEditWorkflow:
         state["plan"] = response.content
         return state
 
+
+
     def _generate_content(self, state: EditState) -> EditState:
         """Generate the new content for each file"""
         logger.info("Generating content")
@@ -466,13 +509,10 @@ class MultiFileEditWorkflow:
         edits = []
         
         # Ask LLM for a structured list of files to edit/create based on the plan
-        # For simplicity in this iteration, we still iterate over input files for modifications
-        # BUT we should also ask the LLM "What NEW files should be created?" or "List ALL files to be touched"
-        # To keep it robust without complex parsing, we'll ask the LLM to generate a JSON list of files first
-        
         candidates_prompt = f"""
         Based on this plan, list ALL files that need to be created or modified. 
-        Return a JSON list of file paths.
+        Return strictly a valid JSON list of strings.
+        Example: ["app.py", "utils.py", "new_service.py"]
         
         Plan:
         {plan}
@@ -481,20 +521,34 @@ class MultiFileEditWorkflow:
         """
         
         candidates_msg = [
-             SystemMessage(content="You are a helper. Return strictly a JSON list of strings, e.g. [\"app.py\", \"utils.py\"]"),
+             SystemMessage(content="You are a helper. Return strictly a JSON list of strings. Do not use markdown blocks."),
              HumanMessage(content=candidates_prompt)
         ]
         
         try:
              import json
              import re
+             import ast
+             
              resp = self.llm_service.precise_llm.invoke(candidates_msg)
-             content = resp.content
+             content = resp.content.strip()
+             
+             # Robust Parsing Strategy
+             target_files = []
              match = re.search(r"\[.*\]", content, re.DOTALL)
              if match:
-                 target_files = json.loads(match.group(0))
-             else:
-                 target_files = state['files'] # Fallback
+                 try:
+                     target_files = json.loads(match.group(0))
+                 except:
+                     try: target_files = ast.literal_eval(match.group(0))
+                     except: pass
+             
+             if not target_files:
+                  if "," in content: target_files = [f.strip().strip('"') for f in content.split(",")]
+                  else: target_files = state['files']
+                  
+             if not isinstance(target_files, list): target_files = state['files']
+                  
         except Exception as e:
              logger.error(f"Failed to parse target files: {e}")
              target_files = state['files']
@@ -509,54 +563,84 @@ class MultiFileEditWorkflow:
              if file_exists:
                  with open(file_path, "r", encoding="utf-8") as f:
                      original_content = f.read()
-                 prompt_type = "MODIFY"
+                 
+                 # TOKEN SAVER: Use SEARCH/REPLACE for existing files
+                 prompt = f"""
+                 Based on the plan, apply changes to: {file_path}
+                 
+                 Plan: {plan}
+                 
+                 Use SEARCH/REPLACE blocks to modify the code.
+                 Format:
+                 <<<<<<< SEARCH
+                 [exact code to replace]
+                 =======
+                 [new code]
+                 >>>>>>> REPLACE
+                 
+                 Rules:
+                 1. SEARCH block must exactly match existing code (include indentation).
+                 2. Include multiple blocks if needed.
+                 3. Do NOT rewrite the whole file.
+                 
+                 Original File Content:
+                 ```
+                 {original_content}
+                 ```
+                 """
+                 
+                 prompt_type = "PATCH"
              else:
-                 prompt_type = "CREATE NEW"
-             
-             prompt = f"""
-             Based on the plan, generate the FULL CONTENT for this file ({prompt_type}).
-             
-             Plan:
-             {plan}
-             
-             File: {file_path}
-             Original Content:
-             """
-             
-             if file_exists:
-                  prompt += f"\n```\n{original_content}\n```"
-             else:
-                  prompt += "\n(New File)"
+                 prompt = f"""
+                 Create new file: {file_path}
+                 Plan: {plan}
+                 Output the FULL content of the new file.
+                 """
+                 prompt_type = "CREATE"
              
              messages = [
-                SystemMessage(content="You are an expert coder. Output ONLY the code for the file. No markdown fences if possible, or standard fences."),
+                SystemMessage(content="You are an expert coder. Output clean code or patch blocks."),
                 HumanMessage(content=prompt)
              ]
              
              response = self.llm_service.precise_llm.invoke(messages)
-             new_content = response.content
+             generated_text = response.content
              
-             if new_content.startswith("```"):
-                 match = re.search(r"```(?:\w+)?\n(.*?)\n```", new_content, re.DOTALL)
-                 if match:
-                     new_content = match.group(1)
+
             
-             if not file_exists or new_content.strip() != original_content.strip():
-                import difflib
-                diff = "".join(difflib.unified_diff(
-                    original_content.splitlines(keepends=True),
-                    new_content.splitlines(keepends=True),
-                    fromfile=os.path.basename(file_path),
-                    tofile=os.path.basename(file_path)
-                ))
-                
-                edits.append({
+             if prompt_type == "PATCH":
+                 # Extract hunks manually without applying them
+                 # Parse blocks: <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE
+                 import re
+                 pattern = r"<{7}\s*SEARCH\s*\n(.*?)\n={7}\s*\n(.*?)\n>{7}\s*REPLACE"
+                 matches = list(re.finditer(pattern, generated_text, re.DOTALL))
+                 
+                 hunks = []
+                 for match in matches:
+                     hunks.append({
+                         "search": match.group(1),
+                         "replace": match.group(2)
+                     })
+                 
+                 # Optimization: Don't calculate diff here, just send hunks.
+                 edits.append({
+                    "file_path": file_path,
+                    "hunks": hunks,
+                    "is_new": False
+                 })
+                 
+             else:
+                 # New file
+                 new_content = generated_text
+                 match = re.search(r"```(?:\w+)?\n(.*?)\n```", new_content, re.DOTALL)
+                 if match: new_content = match.group(1)
+            
+                 edits.append({
                     "file_path": file_path,
                     "new_content": new_content,
-                    "original_content": original_content,
-                    "diff": diff,
-                    "is_new": not file_exists
-                })
+                    "hunks": [], # No hunks for new file
+                    "is_new": True
+                 })
         
         state["edits"] = edits
         return state

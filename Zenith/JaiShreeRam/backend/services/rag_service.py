@@ -39,6 +39,33 @@ class RAGService:
             except Exception as e:
                 logger.error(f"Failed to initialize Chroma: {str(e)}")
 
+    def _clear_existing_index(self):
+        """Robustly clear the existing vector store"""
+        try:
+            # 1. Try using the API if instance exists
+            if self.vector_store:
+                try:
+                    self.vector_store.delete_collection()
+                    logger.info("Deleted Chroma collection via API")
+                except Exception as e:
+                    logger.warning(f"Failed to delete collection via API: {e}")
+                self.vector_store = None
+
+            # 2. Try to force cleanup the directory
+            if os.path.exists(self.persist_directory):
+                import shutil
+                import time
+                try:
+                    # Small delay to allow file handles to release
+                    time.sleep(0.5)
+                    shutil.rmtree(self.persist_directory)
+                    logger.info(f"Removed persistence directory: {self.persist_directory}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove persistence directory: {e}")
+
+        except Exception as e:
+            logger.error(f"Error checking/clearing index: {str(e)}")
+
     def index_codebase(self, directory_path: str) -> Dict[str, Any]:
         """Index the codebase from the given directory"""
         if not self.embeddings:
@@ -50,6 +77,9 @@ class RAGService:
 
             self.current_indexed_path = directory_path
             logger.info(f"Indexing codebase from {directory_path}")
+            
+            # CLEAR EXISTING INDEX FIRST
+            self._clear_existing_index()
             
             # Define allowed extensions
             allowed_extensions = [
@@ -90,23 +120,6 @@ class RAGService:
             
             logger.info(f"Created {len(splits)} chunks from {len(documents)} files")
 
-            # Clean start for local DB to avoid conflicts
-            if os.path.exists(self.persist_directory):
-                try:
-                   # Force reset for this implementation to ensure clean indexing
-                   self.vector_store = None
-                   # We can't easily delete the folder while process uses it, 
-                   # but Chroma.from_documents with same collection name might handle it or we use delete_collection
-                   pass 
-                except:
-                    pass
-
-            if self.vector_store:
-                 try:
-                     self.vector_store.delete_collection()
-                 except:
-                     pass
-                 
             self.vector_store = Chroma.from_documents(
                 documents=splits,
                 embedding=self.embeddings,
@@ -161,7 +174,7 @@ class RAGService:
     def reset_index(self):
         """Reset the vector store and current path"""
         try:
-            self.vector_store = None
+            self._clear_existing_index()
             self.current_indexed_path = None
             logger.info("RAG index reset")
             return {"success": True, "message": "RAG index reset"}

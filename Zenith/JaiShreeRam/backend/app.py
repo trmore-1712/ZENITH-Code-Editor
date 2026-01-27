@@ -39,8 +39,11 @@ file_service = FileService()
 from services.rag_service import RAGService
 rag_service = RAGService()
 
+from services.tree_sitter_service import TreeSitterService
+tree_sitter_service = TreeSitterService()
+
 from agents.workflow import MultiFileEditWorkflow
-multi_file_workflow = MultiFileEditWorkflow(llm_service)
+multi_file_workflow = MultiFileEditWorkflow(llm_service, rag_service, tree_sitter_service)
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Not found", "message": str(error)}), 404

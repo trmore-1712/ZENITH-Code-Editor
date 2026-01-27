@@ -5,4 +5,5 @@ build/
 chroma/
 chroma_db/
 chromadb/
+chroma_db_local/
 *.sqlite3
