@@ -410,6 +410,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
+
+    multiFileEdit: async (task, files) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/agent/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    task,
+                    files
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error in multi-file edit:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
     
     checkBackendHealth: async () => {
         try {

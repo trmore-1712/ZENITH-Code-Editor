@@ -1,16 +1,42 @@
-// Welcome to AI Code Editor
-// This is a sample JavaScript file
+// logger.js
 
-function fibonacci(n) {
-    if (n <= 1) return n;
-    return fibonacci(n - 1) + fibonacci(n - 2);
+/**
+ * @deprecated This class is for demonstration of replacement.
+ * Please use AdvancedLogger instead.
+ */
+class OldLogger {
+    constructor(prefix = 'App') {
+        this.prefix = prefix;
+    }
+
+    log(message) {
+        console.log(`[OLD][${this.prefix}] ${message}`); // Added 'OLD' to distinguish output
+    }
 }
 
-function factorial(n) {
-    if (n === 0) return 1;
-    return n * factorial(n - 1);
+// The NEW and more useful class
+class AdvancedLogger {
+    constructor(prefix = 'App') {
+        this.prefix = prefix;
+    }
+
+    _getTimestamp() {
+        return new Date().toISOString();
+    }
+
+    log(message) {
+        console.log(`[${this._getTimestamp()}][INFO][${this.prefix}] ${message}`);
+    }
+
+    warn(message) {
+        console.warn(`[${this._getTimestamp()}][WARN][${this.prefix}] ${message}`);
+    }
+
+    error(message) {
+        console.error(`[${this._getTimestamp()}][ERROR][${this.prefix}] ${message}`);
+    }
 }
 
-// Example usage
-console.log('Fibonacci of 10:', fibonacci(10));
-console.log('Factorial of 5:', factorial(5));
+// --- THE REPLACEMENT PART ---
+// We now export the AdvancedLogger, effectively replacing OldLogger as the primary export
+module.exports = AdvancedLogger;
