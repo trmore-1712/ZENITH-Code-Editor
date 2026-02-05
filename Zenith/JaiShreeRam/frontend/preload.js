@@ -13,6 +13,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteFile: (data) => ipcRenderer.invoke('delete-file', data),
     getDirectoryFiles: (dirPath) => ipcRenderer.invoke('get-directory-files', dirPath),
     runCode: (data) => ipcRenderer.invoke('run-code', data),
+    
+    resolvePath: (basePath, relativePath) => {
+        try {
+            const path = require('path');
+            return path.resolve(basePath, relativePath);
+        } catch (error) {
+            console.error('Error resolving path:', error);
+            return relativePath;
+        }
+    },
+
     readFileContent: (filePath) => {
         return new Promise((resolve, reject) => {
             try {

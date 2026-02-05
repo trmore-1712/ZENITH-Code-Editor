@@ -2110,8 +2110,17 @@ class CodeEditor {
                      this.addAIMessage('ai', `I've proposed changes for ${result.edits.length} files. Opening them for review...`);
                      
                      for (const edit of result.edits) {
+                         // PRE-FIX: Resolve path against workspace if it looks relative
+                         let filePath = edit.file_path;
+                         if (this.workspacePath && window.electronAPI.resolvePath && !filePath.includes(':') && !filePath.startsWith('/')) {
+                             // It's likely relative, force it to be inside workspace
+                             filePath = window.electronAPI.resolvePath(this.workspacePath, filePath);
+                             console.log(`Resolved agent path ${edit.file_path} -> ${filePath}`);
+                             edit.file_path = filePath; // Update the edit object itself
+                         }
+
                          // Normalize path immediately to match tab system
-                         const filePath = this.normalizePath(edit.file_path);
+                         filePath = this.normalizePath(filePath);
                          const fileName = this.getFileNameFromPath(filePath);
                          
                          // 1. Ensure Original Content exists
