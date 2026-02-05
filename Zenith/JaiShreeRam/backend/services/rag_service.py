@@ -9,18 +9,16 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# Keep logging simple
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class RAGService:
-    # Extensions to index
     ALLOWED_EXTS = {
         ".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".cpp", ".c", ".h", ".cs", 
         ".go", ".rs", ".php", ".rb", ".html", ".css", ".sql", ".md", ".json"
     }
     
-    # Directories to ignore
+    #
     IGNORE_DIRS = {"node_modules", ".git", "__pycache__", "venv", ".env", "chroma_db_local"}
 
     def __init__(self):
@@ -34,7 +32,6 @@ class RAGService:
             logger.error(f"Embeddings init failed: {e}")
             self.embeddings = None
 
-        # Load existing db if available
         if self.embeddings and os.path.exists(self.persist_directory):
             self.vector_store = Chroma(
                 persist_directory=self.persist_directory,
@@ -44,7 +41,7 @@ class RAGService:
 
     def _clear_index(self):
         """Clears the current vector store and deletes the persistence directory."""
-        # 1. Try to delete collection via API if possible (cleanest way)
+        
         if self.vector_store:
             try:
                 self.vector_store.delete_collection()
@@ -54,16 +51,16 @@ class RAGService:
             
             self.vector_store = None
         
-        # Force garbage collection to release file handles
+        
         import gc
         gc.collect()
 
-        # 2. Try to nuke directory (Fallback)
+        
         if os.path.exists(self.persist_directory):
-            # Windows file locking retry loop
+           
             for attempt in range(3):
                 try:
-                    # Windows sometimes holds file locks, so we wait a bit
+                   
                     if attempt > 0: time.sleep(1)
                     
                     if os.path.exists(self.persist_directory):
@@ -72,8 +69,7 @@ class RAGService:
                     break
                 except Exception as e:
                     logger.warning(f"Attempt {attempt+1}/3 to delete folder failed: {e}")
-                    # If we can't delete it, we just proceed. Chroma will likely just use the existing folder
-                    # which is empty now if delete_collection worked.
+                    
 
 
     def index_codebase(self, directory_path: str):
@@ -84,14 +80,14 @@ class RAGService:
             return {"success": False, "error": f"Path not found: {directory_path}"}
 
         try:
-            print(f"🔄 [RAG] Starting indexing for: {directory_path}")
+            print(f" [RAG] Starting indexing for: {directory_path}")
             logger.info(f"Indexing {directory_path}...")
             self._clear_index()
             self.current_indexed_path = directory_path
             
             documents = []
             for root, dirs, files in os.walk(directory_path):
-                # Prune ignored directories
+                
                 dirs[:] = [d for d in dirs if d not in self.IGNORE_DIRS and not d.startswith('.')]
                 
                 for file in files:
@@ -110,7 +106,7 @@ class RAGService:
             if not documents:
                 return {"success": False, "error": "No documents found to index"}
 
-            # Split and Store
+            
             splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             splits = splitter.split_documents(documents)
             
@@ -121,7 +117,7 @@ class RAGService:
                 collection_name="codebase_context_local"
             )
             
-            print(f"✅ [RAG] Indexing complete! {len(documents)} files processed.")
+            print(f" [RAG] Indexing complete! {len(documents)} files processed.")
             
             return {
                 "success": True, 
@@ -172,7 +168,7 @@ class RAGService:
     def query_with_context(self, query: str):
         docs = self.retrieve_context(query)
     
-        # Extract unique filenames
+        
         sources = []
         for doc in docs:
             filename = doc.metadata.get("filename")
@@ -181,7 +177,6 @@ class RAGService:
     
         sources.sort()
     
-        # Build context string
         context_parts = []
         for doc in docs:
             filename = doc.metadata.get("filename", "unknown")

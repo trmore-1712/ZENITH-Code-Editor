@@ -5,10 +5,8 @@ import os
 import logging
 from datetime import datetime
 import traceback
-# from utils.ollama_helpers import OllamaHelper
 import os
 
-# os.environ["OLLAMA_HOST"] = "localhost:11435"
 load_dotenv()
 
 logging.basicConfig(
@@ -455,61 +453,6 @@ def reset_rag_index():
     except Exception as e:
         logger.error(f"Error in reset_rag_index: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
-
-
-# @app.route("/api/ollama/health", methods=["GET"])
-# def ollama_health():
-#     """Check Ollama health and available models"""
-#     try:
-#         models = OllamaHelper.list_models()
-
-#         return jsonify(
-#             {
-#                 "success": True,
-#                 "ollama_running": len(models) > 0,
-#                 "available_models": [m["name"] for m in models],
-#                 "model_count": len(models),
-#             }
-#         )
-#     except Exception as e:
-#         return jsonify(
-#             {
-#                 "success": False,
-#                 "ollama_running": False,
-#                 "error": str(e),
-#                 "message": "Ollama is not running. Please start it with: ollama serve",
-#             }
-#         )
-
-
-# @app.route("/api/ollama/pull", methods=["POST"])
-# def pull_model():
-#     """Pull a model from Ollama"""
-#     try:
-#         data = request.get_json()
-#         model_name = data.get("model", "codellama:7b")
-
-#         success = OllamaHelper.pull_model(model_name)
-
-#         return jsonify(
-#             {
-#                 "success": success,
-#                 "model": model_name,
-#                 "message": (
-#                     f"Started pulling model: {model_name}"
-#                     if success
-#                     else "Failed to pull model"
-#                 ),
-#             }
-#         )
-#     except Exception as e:
-#         logger.error(f"Error pulling model: {str(e)}")
-#         return (
-#             jsonify(
-#                 {"success": False, "error": str(e), "message": "Failed to pull model"}
-#             ),
-#             500,
-#         )
 
 
 @app.route("/api/agent/edit", methods=["POST"])

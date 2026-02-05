@@ -7,7 +7,6 @@ from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
 
-
 class FileService:
     def __init__(self):
         self.allowed_extensions = {
