@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
@@ -36,6 +36,9 @@ llm_service = GeminiService() # OllamaService()
 file_service = FileService()
 from services.rag_service import RAGService
 rag_service = RAGService()
+
+from services.pdf_service import PDFService
+pdf_service = PDFService()
 
 from services.tree_sitter_service import TreeSitterService
 tree_sitter_service = TreeSitterService()
@@ -85,33 +88,45 @@ def health_check():
         }
     )
 
-@app.route("/api/generate", methods=["POST"])
-def generate_code():
+@app.route("/api/document/generate", methods=["POST"])
+def generate_documentation():
     try:
         data = request.get_json()
 
-        if not data or "prompt" not in data:
-            return jsonify({"error": "Missing prompt field"}), 400
-        prompt = data["prompt"]
-        language = data.get("language", "python")
+        if not data or "code" not in data:
+            return jsonify({"error": "Missing code field"}), 400
+        
+        code = data["code"]
         context = data.get("context", "")
-        logger.info(f"Generating code for prompt: {prompt[:50]}...")
-        result = llm_service.generate_code(
-            prompt=prompt, language=language, context=context
-        )
+        filename = data.get("filename", "documentation.pdf")
+        
+        # Ensure filename ends with .pdf
+        if not filename.endswith('.pdf'):
+            filename += '.pdf'
 
-        return jsonify(
-            {
-                "success": True,
-                "code": result["code"],
-                "explanation": result["explanation"],
-                "language": language,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+        logger.info(f"Generating documentation for file: {filename}")
+        
+        # 1. Generate Markdown Documentation
+        doc_result = llm_service.generate_documentation(code=code, context=context)
+        
+        if not doc_result["success"]:
+             return jsonify(doc_result), 500
+             
+        markdown_content = doc_result["documentation"]
+        
+        # 2. Convert to PDF
+        pdf_path = pdf_service.create_pdf(markdown_content, filename)
+        
+        # 3. Send File
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
         )
 
     except Exception as e:
-        logger.error(f"Error in generate_code: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Error in generate_documentation: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

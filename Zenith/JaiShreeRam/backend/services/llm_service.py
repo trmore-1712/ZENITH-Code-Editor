@@ -50,42 +50,47 @@ class GeminiService:
             else:
                 raise ValueError("GEMINI_API_KEY is missing. Please add it to .env file.")
 
-    def generate_code(self, prompt: str, language: str = "python", context: str = "") -> Dict[str, Any]:
-        """Generate code using Gemini"""
+    def generate_documentation(self, code: str, context: str = "") -> Dict[str, Any]:
+        """Generate comprehensive documentation for code"""
         try:
             self._ensure_configured()
-            system_prompt = f"""You are an expert {language} programmer. Generate clean, efficient, and well-documented code.
+            system_prompt = """You are an expert technical writer. Your task is to generate comprehensive documentation for the provided codebase/file.
 
-Requirements:
-1. Follow {language} best practices and conventions
-2. Include proper error handling
-3. Add meaningful comments
-4. Make it production-ready
-5. Include usage examples if applicable
+            The user wants the documentation to be structured specifically with these sections:
+            1. **Concepts**: Explain the core concepts, design patterns, and algorithmic principles used.
+            2. **Description**: A detailed narrative description of what the code does, its purpose, and its functionality.
+            3. **Structure**: An analysis of the code's structure, architecture, module organization, and how components interact.
+            4. **Key Components**: A reference of important classes, functions, and their roles.
+            
+            IMPORTANT:
+            - Format the output in clean Markdown.
+            - Do NOT act as a chatbot. Do NOT say "Please provide code". 
+            - If the code context is provided, USE IT. 
+            - If the code seems incomplete, document what is there to the best of your ability.
+            - The output will be converted to PDF, so use standard Markdown formatting.
 
-Context: {context}
-"""
+            Context: {context}
+            """
+            
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Generate {language} code for: {prompt}"),
+                HumanMessage(content=f"Generate documentation for this code:\n\n{code}"),
             ]
             
             response = self.llm.invoke(messages)
             
             return {
                 "success": True,
-                "code": response.content,
-                "explanation": f"Generated using {self.model}",
-                "language": language,
+                "documentation": response.content,
+                "model": self.model
             }
 
         except Exception as e:
-            logger.error(f"Error generating code: {str(e)}")
+            logger.error(f"Error generating documentation: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
-                "code": f"// Error generating code: {str(e)}",
-                "explanation": "Failed to generate code",
+                "documentation": f"Error generating documentation: {str(e)}"
             }
 
     def explain_code(self, code: str, language: str = "auto", detail_level: str = "comprehensive") -> str:

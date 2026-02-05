@@ -22,7 +22,7 @@ class CodeEditor {
         this.isWindows = navigator.platform.indexOf('Win') > -1;
         this.pendingEdits = []; // Store edits for review
         this.diffEditor = null; // Monaco Diff Editor instance
-        
+
         this.currentMode = 'chat'; // 'chat' or 'agent'
         this.init();
     }
@@ -374,7 +374,7 @@ class CodeEditor {
         window.electronAPI.onFolderOpened((data) => {
             console.log('Folder opened:', data);
             this.openFolder(data.folderPath, data.files, data.folderStructure);
-            
+
             // Auto-Index Codebase for RAG
             this.addAIMessage('ai', `📂 New folder detected. Indexing codebase for RAG context...`);
             this.indexCodebase(); // Uses current workspacePath set by openFolder
@@ -533,8 +533,8 @@ class CodeEditor {
         // Only clear if we are rendering the root
         if (depth === 0) {
             parentElement.innerHTML = '';
-            
-             // Add workspace info if we have a workspace
+
+            // Add workspace info if we have a workspace
             if (this.workspacePath) {
                 this.updateWorkspaceInfo(this.workspacePath);
             }
@@ -577,7 +577,7 @@ class CodeEditor {
             // Use common class 'file-tree-row'? No, keeping existing classes but styled differently in CSS
             element.className = child.type === 'folder' ? 'folder-item' : 'file-item';
             element.dataset.path = child.path;
-            
+
             // Highlight active file
             if (child.type === 'file' && this.currentFile === child.path) {
                 element.classList.add('active');
@@ -588,13 +588,13 @@ class CodeEditor {
                 this.getFileIcon(child.name);
 
             // Indentation
-            const paddingLeft = 10 + (depth * 15); 
+            const paddingLeft = 10 + (depth * 15);
 
             element.innerHTML = `
                 <div class="file-item-content" style="padding-left: ${paddingLeft}px;">
-                    ${child.type === 'folder' ? 
-                        `<i class="fas fa-chevron-right folder-chevron" style="transform: ${child.open ? 'rotate(90deg)' : 'rotate(0deg)'}; transition: transform 0.2s;"></i>` 
-                        : '<span style="width:16px; margin-right:2px; display:inline-block;"></span>'}
+                    ${child.type === 'folder' ?
+                    `<i class="fas fa-chevron-right folder-chevron" style="transform: ${child.open ? 'rotate(90deg)' : 'rotate(0deg)'}; transition: transform 0.2s;"></i>`
+                    : '<span style="width:16px; margin-right:2px; display:inline-block;"></span>'}
                     
                     <i class="fas ${icon}" style="margin-right: 6px; width: 16px; text-align: center; color: ${child.type === 'folder' ? '#dcb67a' : 'inherit'}"></i>
                     <span class="file-name">${child.name}</span>
@@ -620,7 +620,7 @@ class CodeEditor {
                     child.open = !child.open;
                     this.renderFileTree(); // Full re-render is simplest for consistency
                 } else {
-                     // Check if file is virtual (starts with /) or has stored content
+                    // Check if file is virtual (starts with /) or has stored content
                     if (child.path.startsWith('/')) {
                         // Virtual file - use stored content from tabs or empty
                         const tabInfo = this.tabs.get(child.path);
@@ -643,7 +643,7 @@ class CodeEditor {
                             }
                         });
                     }
-                    
+
                     // Highlight active
                     document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
                     element.classList.add('active');
@@ -661,7 +661,7 @@ class CodeEditor {
                 this.renderFileTree(child, itemContainer, depth + 1);
             }
         });
-        
+
         parentElement.appendChild(frag);
     }
 
@@ -720,9 +720,9 @@ class CodeEditor {
 
     async openFile(filePath, content, fileName) {
         // Normalize path for consistent tab keys
-        const originalPath = filePath; 
-        filePath = this.normalizePath(filePath); 
-        
+        const originalPath = filePath;
+        filePath = this.normalizePath(filePath);
+
         console.log(`Opening file: ${fileName} (${filePath})`);
 
         // IMPORTANT: Save current tab content BEFORE switching
@@ -735,11 +735,11 @@ class CodeEditor {
 
         // Stop watching previous file (if switching)
         if (this.currentFile && this.currentFile !== filePath && this.fileSystemWatchers.has(this.currentFile)) {
-             // Optional: Keep watchers alive for open tabs? 
-             // Current logic closes watcher on switch? That's probably efficient but means background tabs don't update.
-             // For now, keep existing behavior but use normalized check
-             this.fileSystemWatchers.get(this.currentFile).close();
-             this.fileSystemWatchers.delete(this.currentFile);
+            // Optional: Keep watchers alive for open tabs? 
+            // Current logic closes watcher on switch? That's probably efficient but means background tabs don't update.
+            // For now, keep existing behavior but use normalized check
+            this.fileSystemWatchers.get(this.currentFile).close();
+            this.fileSystemWatchers.delete(this.currentFile);
         }
 
         this.currentFile = filePath;
@@ -760,9 +760,9 @@ class CodeEditor {
         if (tabInfo) {
             // Only update content if provided (don't overwrite with empty if undefined)
             if (content !== undefined) {
-                 tabInfo.content = content;
+                tabInfo.content = content;
             } else if (tabInfo.content === undefined) {
-                 tabInfo.content = '';
+                tabInfo.content = '';
             }
             console.log(`Stored content for file: ${filePath}, length: ${tabInfo.content.length}`);
         }
@@ -917,7 +917,7 @@ class CodeEditor {
                     diffContainer.style.zIndex = '9999'; // Very high z-index
                     diffContainer.style.backgroundColor = '#1e1e1e'; // Opaque background
                     document.getElementById('editor').appendChild(diffContainer);
-                    
+
                     this.diffEditorInstance = monaco.editor.createDiffEditor(diffContainer, {
                         theme: 'vs-dark',
                         automaticLayout: true,
@@ -927,23 +927,23 @@ class CodeEditor {
                     });
                 }
                 diffContainer.style.display = 'block';
-                
+
                 const edit = tabInfo.editData;
                 const originalModel = monaco.editor.createModel(edit.original_content, this.getLanguageFromExtension(edit.file_path));
                 const modifiedModel = monaco.editor.createModel(edit.new_content, this.getLanguageFromExtension(edit.file_path));
-                
+
                 this.diffEditorInstance.setModel({
                     original: originalModel,
                     modified: modifiedModel
                 });
-                
+
                 // Force layout update
                 setTimeout(() => {
                     this.diffEditorInstance.layout();
                 }, 50);
 
                 this.renderDiffActions(diffContainer, tabInfo.editData, filePath);
-                
+
             } else {
                 // Standard Editor Tab
                 // Hide diff container if exists
@@ -955,13 +955,13 @@ class CodeEditor {
                 // Update editor content from stored content
                 if (this.editor) {
                     const contentToSet = tabInfo.content !== undefined ? tabInfo.content : '';
-                    
+
                     // Only setValue if it's different to prevent cursor jumping or unnecessary updates
                     // But if we are refreshing after edit, we MUST update.
                     // editor.getValue() might be stale if we just hid diff view.
-                    
+
                     if (this.editor.getValue() !== contentToSet) {
-                         this.editor.setValue(contentToSet);
+                        this.editor.setValue(contentToSet);
                     }
                     console.log(`Loaded content for tab: ${filePath}, length: ${contentToSet.length}`);
 
@@ -970,10 +970,10 @@ class CodeEditor {
                     const language = this.getLanguageFromExtension(fileName);
                     const model = this.editor.getModel();
                     if (model) {
-                         monaco.editor.setModelLanguage(model, language);
+                        monaco.editor.setModelLanguage(model, language);
                     }
                 }
-                
+
                 // Update UI elements for standard tabs
                 const fileName = tabInfo.fileName;
                 document.getElementById('file-path').textContent = this.getFileNameFromPath(filePath) || fileName;
@@ -1023,19 +1023,19 @@ class CodeEditor {
             `;
             container.appendChild(toolbar);
         }
-        
+
         toolbar.innerHTML = '';
-        
+
         const acceptBtn = document.createElement('button');
         acceptBtn.className = 'diff-overlay-btn btn-accept-change';
         acceptBtn.innerHTML = '<i class="fas fa-check"></i> Accept';
         acceptBtn.onclick = () => this.applySingleEdit(edit);
-        
+
         const rejectBtn = document.createElement('button');
-        rejectBtn.className = 'diff-overlay-btn btn-reject-change'; 
+        rejectBtn.className = 'diff-overlay-btn btn-reject-change';
         rejectBtn.innerHTML = '<i class="fas fa-times"></i> Reject';
         rejectBtn.onclick = () => this.rejectSingleEdit(edit);
-        
+
         toolbar.appendChild(acceptBtn);
         toolbar.appendChild(rejectBtn);
     }
@@ -1047,7 +1047,7 @@ class CodeEditor {
         let normalized = filePath.replace(/\\/g, '/');
         // If on Windows (heuristic), lowercase valid drive letter
         if (normalized.match(/^[a-zA-Z]:\//)) {
-           normalized = normalized.charAt(0).toLowerCase() + normalized.slice(1);
+            normalized = normalized.charAt(0).toLowerCase() + normalized.slice(1);
         }
         return normalized; // Simple normalization for now. 
         // ideally we'd use path.resolve() but that's node-specific and we want consistent string keys
@@ -1057,68 +1057,68 @@ class CodeEditor {
         try {
             // Normalize properly
             let editPath = this.normalizePath(edit.file_path);
-            
+
             // Determine effective file path
             let targetPath = edit.file_path; // Keep original for FS ops
-            
+
             const isNew = edit.is_new;
             if (isNew) {
                 const fileName = this.getFileNameFromPath(edit.file_path);
-                
+
                 targetPath = await window.electronAPI.createFile({
-                     folderPath: this.workspacePath, 
-                     fileName: fileName
+                    folderPath: this.workspacePath,
+                    fileName: fileName
                 });
                 console.log(`Created new file at: ${targetPath}`);
-            } 
-            
+            }
+
             await window.electronAPI.saveFile({
                 filePath: targetPath,
                 content: edit.new_content
             });
-            
+
             // Update Tab State
             // Try matching normalized
             let tabFilePath = editPath;
             if (!this.tabs.has(tabFilePath)) {
-                 // Try finding by fuzzy match or original?
-                 // If not found, check if we have it under original
-                 if (this.tabs.has(edit.file_path)) tabFilePath = edit.file_path;
+                // Try finding by fuzzy match or original?
+                // If not found, check if we have it under original
+                if (this.tabs.has(edit.file_path)) tabFilePath = edit.file_path;
             }
 
             if (this.tabs.has(tabFilePath)) {
                 const tabInfo = this.tabs.get(tabFilePath);
-                
+
                 // CRITICAL SEQUENCE:
                 // 1. Update state data first
                 tabInfo.isDiff = false;
                 tabInfo.editData = null;
-                tabInfo.content = edit.new_content; 
-                
+                tabInfo.content = edit.new_content;
+
                 // 2. If this is the active tab, directly update editor to prevent setActiveTab from overwriting with stale data
                 if (this.activeTab === tabFilePath) {
                     if (this.editor) {
                         this.editor.setValue(edit.new_content);
                     }
-                    
+
                     // Hide Diff View Manually
                     const diffContainer = document.getElementById('diff-editor-container-tab');
                     if (diffContainer) diffContainer.style.display = 'none';
-                    
+
                     // Remove review mode class
                     tabInfo.element.classList.remove('review-mode');
                 }
-                
+
                 // 3. Force UI Refresh without saving stale content
                 // We pass a flag or just call it, but we need to ensure setActiveTab doesn't save *this* tab's stale content
                 // Refactor setActiveTab to check `this.activeTab !== filePath` for saving.
-                await this.setActiveTab(tabFilePath); 
+                await this.setActiveTab(tabFilePath);
             }
             this.showNotification(`Changes applied to ${this.getFileNameFromPath(targetPath)}`, 'success');
-            
+
             // Refresh file tree
             this.refreshFileTree();
-            
+
         } catch (error) {
             this.showNotification(`Error applying edit: ${error.message}`, 'error');
         }
@@ -1128,7 +1128,7 @@ class CodeEditor {
         const filePath = edit.file_path;
         if (this.tabs.has(filePath)) {
             const tabInfo = this.tabs.get(filePath);
-            
+
             if (edit.is_new) {
                 // If it was a new file, just close the tab
                 this.closeTab(filePath);
@@ -1191,15 +1191,15 @@ class CodeEditor {
         if (tabsContainer) {
             tabsContainer.innerHTML = '';
         }
-        
+
         // Reset Editor State
         this.currentFile = null;
         this.activeTab = null;
         if (this.editor) {
             this.editor.setValue('');
             document.getElementById('file-path').textContent = '';
-            const langStatus = document.getElementById('language-status'); 
-            if(langStatus) langStatus.querySelector('span').textContent = 'Plain Text';
+            const langStatus = document.getElementById('language-status');
+            if (langStatus) langStatus.querySelector('span').textContent = 'Plain Text';
         }
     }
 
@@ -1438,22 +1438,22 @@ class CodeEditor {
         this.closeAllTabs();
         this.clearAIChat();
 
-    // Reset Chat and RAG
-    const chatMessages = document.getElementById('ai-chat-messages');
-    if (chatMessages) chatMessages.innerHTML = '';
-    this.aiChatHistory = [];
-    
-    const ragToggle = document.getElementById('rag-toggle');
-    if (ragToggle) ragToggle.checked = true;
-    
-    try {
-        await window.electronAPI.resetRAGIndex();
-        this.indexCodebase(); // Trigger indexing (async)
-    } catch (err) {
-        console.error('Failed to reset RAG:', err);
-    }
+        // Reset Chat and RAG
+        const chatMessages = document.getElementById('ai-chat-messages');
+        if (chatMessages) chatMessages.innerHTML = '';
+        this.aiChatHistory = [];
 
-    // Use the folder structure if provided
+        const ragToggle = document.getElementById('rag-toggle');
+        if (ragToggle) ragToggle.checked = true;
+
+        try {
+            await window.electronAPI.resetRAGIndex();
+            this.indexCodebase(); // Trigger indexing (async)
+        } catch (err) {
+            console.error('Failed to reset RAG:', err);
+        }
+
+        // Use the folder structure if provided
         if (folderStructure) {
             this.fileTree = folderStructure;
         } else {
@@ -1738,17 +1738,50 @@ class CodeEditor {
             let result;
 
             switch (action) {
-                case 'generate':
-                    result = await window.electronAPI.generateCode(
-                        selectedText || 'Generate a useful code snippet',
-                        '',
-                        language
+                case 'generate_docs':
+                    this.showNotification('Generating documentation...', 'info');
+
+                    let contentToDocument = code;
+                    let contextInfo = `Language: ${language}\nFile: ${this.currentFile || 'untitled'}`;
+                    let filename = `Docs_${this.getFileNameFromPath(this.currentFile || 'untitled')}.pdf`;
+
+                    // If workspace is open, try to document the whole project
+                    if (this.workspacePath) {
+                        this.showNotification('Gathering project files...', 'info');
+                        const projectContent = await window.electronAPI.getProjectContent(this.workspacePath);
+                        if (projectContent && projectContent.length > 0) {
+                            contentToDocument = projectContent;
+                            contextInfo = `Project: ${this.workspacePath}\nContains multiple files.`;
+                            filename = `Docs_Project_${this.getFileNameFromPath(this.workspacePath)}.pdf`;
+                        }
+                    }
+
+                    if (!contentToDocument) {
+                        this.showNotification('No code found to document.', 'warning');
+                        return;
+                    }
+
+                    result = await window.electronAPI.generateDocumentation(
+                        contentToDocument,
+                        contextInfo
                     );
+
                     if (result.success) {
-                        this.editor.setValue(result.code);
-                        this.showNotification('Code generated successfully', 'success');
+                        const blob = new Blob([result.data], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        this.showNotification('Documentation downloaded successfully', 'success');
+                        this.addAIMessage('ai', `PDF Documentation generated and downloaded.`);
                     } else {
-                        this.showNotification(`AI Error: ${result.error}`, 'error');
+                        this.showNotification(`Error: ${result.error}`, 'error');
                     }
                     break;
 
@@ -1820,7 +1853,7 @@ class CodeEditor {
                     // Multi-file edit requested
                     // The backend should return a plan or list of edits
                     // We'll treat this differently - maybe call a different endpoint or handle 'task' param
-                    
+
                     // For now, let's assume specific endpoint usage if action is 'edit'
                     // Implementation below
                     break;
@@ -1836,18 +1869,18 @@ class CodeEditor {
 
     simulateProgress(elementId) {
         const phases = [
-            "Analyzing context...", 
-            "Reading files...", 
-            "Planning changes...", 
+            "Analyzing context...",
+            "Reading files...",
+            "Planning changes...",
             "Designing solution...",
             "Generating code...",
             "Reviewing changes...",
             "Finalizing..."
         ];
-        
+
         let phaseIndex = 0;
         const element = document.getElementById(elementId);
-        
+
         const interval = setInterval(() => {
             const el = document.getElementById(elementId);
             if (el) {
@@ -1858,76 +1891,76 @@ class CodeEditor {
                 if (messages) messages.scrollTop = messages.scrollHeight;
             }
         }, 2000); // Update every 2 seconds
-        
+
         return () => clearInterval(interval);
     }
 
     async openEditAsDiff(edit) {
         const filePath = edit.file_path;
-        
+
         // ensure file is open (creates tab if needed)
         if (edit.is_new) {
-             const fileName = this.getFileNameFromPath(filePath);
-             if (!this.tabs.has(filePath)) {
-                 this.createTab(filePath, fileName);
-             }
+            const fileName = this.getFileNameFromPath(filePath);
+            if (!this.tabs.has(filePath)) {
+                this.createTab(filePath, fileName);
+            }
         } else {
-             // Open existing file
-             try {
+            // Open existing file
+            try {
                 // We use openFile to ensure tab exists and content loaded
-                await this.openFile(filePath, null, this.getFileNameFromPath(filePath)); 
-             } catch(e) {
-                 console.warn("Could not open file from disk (maybe new?):", e);
-             }
+                await this.openFile(filePath, null, this.getFileNameFromPath(filePath));
+            } catch (e) {
+                console.warn("Could not open file from disk (maybe new?):", e);
+            }
         }
-        
+
         // hijacked tab for diff view
         if (this.tabs.has(filePath)) {
             const tabInfo = this.tabs.get(filePath);
             tabInfo.isDiff = true;
             tabInfo.editData = edit;
-            
+
             // Force refresh to show diff
             this.setActiveTab(filePath);
         }
     }
-    
+
     // Override/Extend setTabContent to handle diff editors?
     // Current architecture creates one editor `this.editor`.
     // We need to support swapping the editor instance or model.
     // simpler approach: When active tab is a Diff tab, dispose default editor (or hide) and show diff editor.
-    
+
     // NOTE: For this step, I'll modify setActiveTab in a subsequent edit or assume I can inject logic here. 
     // Actually, `setActiveTab` logic is complex. Let's try to hook into the existing system by:
     // 1. Modifying `setActiveTab` to check for `isDiff` flag.
     // 2. If diff, render DiffEditor.
-    
+
     async applyAllEdits(edits) {
         this.showNotification('Applying all changes...', 'info');
         try {
             for (const edit of edits) {
                 // Save to disk
                 const isNew = edit.is_new;
-                
+
                 if (isNew) {
                     await window.electronAPI.createFile({
-                         folderPath: this.workspacePath, 
-                         fileName: this.getFileNameFromPath(edit.file_path)
+                        folderPath: this.workspacePath,
+                        fileName: this.getFileNameFromPath(edit.file_path)
                     });
                 }
-                
+
                 await window.electronAPI.saveFile({
                     filePath: edit.file_path,
                     content: edit.new_content
                 });
-                
+
                 // Reset Tab State
                 if (this.tabs.has(edit.file_path)) {
                     const tabInfo = this.tabs.get(edit.file_path);
                     tabInfo.isDiff = false;
                     tabInfo.editData = null;
                     tabInfo.content = edit.new_content; // Update stored content
-                    
+
                     // If this is the active tab, reload to show standard editor
                     if (this.activeTab === edit.file_path) {
                         this.setActiveTab(edit.file_path);
@@ -1936,10 +1969,10 @@ class CodeEditor {
             }
             this.showNotification('Changes applied!', 'success');
             this.refreshFileTree();
-            
+
             // Reload current tab just in case
             if (this.activeTab) this.setActiveTab(this.activeTab);
-            
+
         } catch (error) {
             this.showNotification(`Error: ${error.message}`, 'error');
         }
@@ -1947,17 +1980,17 @@ class CodeEditor {
 
     setChatMode(mode) {
         this.currentMode = mode;
-        
+
         // Update UI
         const chatBtn = document.getElementById('mode-chat');
         const agentBtn = document.getElementById('mode-agent');
-        
+
         if (chatBtn && agentBtn) {
             if (mode === 'chat') {
                 chatBtn.classList.add('active');
                 chatBtn.style.background = '#007acc';
                 chatBtn.style.color = 'white';
-                
+
                 agentBtn.classList.remove('active');
                 agentBtn.style.background = 'transparent';
                 agentBtn.style.color = '#858585';
@@ -1965,7 +1998,7 @@ class CodeEditor {
                 agentBtn.classList.add('active');
                 agentBtn.style.background = '#4ec9b0';
                 agentBtn.style.color = '#1e1e1e';
-                
+
                 chatBtn.classList.remove('active');
                 chatBtn.style.background = 'transparent';
                 chatBtn.style.color = '#858585';
@@ -1986,10 +2019,10 @@ class CodeEditor {
             this.showNotification('Please enter a message', 'warning');
             return;
         }
-        
+
         // Detect if this is an explicit edit command
         if (message.toLowerCase().startsWith('/edit') || message.toLowerCase().includes('change current file')) {
-             // For now, hook into chat, but ideally we parse intent
+            // For now, hook into chat, but ideally we parse intent
         }
 
         this.addAIMessage('user', message);
@@ -2031,7 +2064,7 @@ class CodeEditor {
                 current_file: this.currentFile || 'Untitled',
                 use_rag: useRag
             };
-            
+
             // Check Mode
             if (this.currentMode === 'agent') {
                 // Agent Mode: Use Multi-File Workflow
@@ -2065,163 +2098,163 @@ class CodeEditor {
             // Maxwell's Demon: Sorting the fast (in memory) from the slow (needs fetching)
             // 1. Collect potential context files
             let contextFiles = [];
-            
+
             // Add current file
             if (this.currentFile && !this.currentFile.startsWith('Untitled')) {
                 contextFiles.push(this.currentFile);
             }
-            
+
             // Add open tabs
             for (const [filePath, tab] of this.tabs.entries()) {
                 if (filePath && !filePath.startsWith('Untitled')) {
                     contextFiles.push(filePath);
                 }
             }
-            
+
             // Add visible files in root (simple heuristic for now, RAG will handle deep search)
             if (this.fileTree && this.fileTree.children) {
                 this.fileTree.children.forEach(child => {
-                     if (child.type === 'file' && !contextFiles.includes(child.path)) {
-                         contextFiles.push(child.path);
-                     }
+                    if (child.type === 'file' && !contextFiles.includes(child.path)) {
+                        contextFiles.push(child.path);
+                    }
                 });
             }
-            
+
             contextFiles = [...new Set(contextFiles)]; // Dedupe
-            
-            
+
+
             console.log('Sending multi-file edit request:', { task, files: contextFiles });
-            
+
             this.addAIMessage('ai', `Analyzing request...`);
             this.showAITypingIndicator();
 
             const result = await window.electronAPI.multiFileEdit(task, contextFiles);
-            
+
             this.hideAITypingIndicator();
-            
+
             if (result.success) {
                 // Show Plan
                 if (result.plan) {
                     this.addAIMessage('ai', `**Plan:**\n${result.plan}\n\nReviewing changes...`);
                 }
-                
+
                 // Cursor-like Review: Open tabs and set them to Diff Mode
                 if (result.edits && result.edits.length > 0) {
-                     this.addAIMessage('ai', `I've proposed changes for ${result.edits.length} files. Opening them for review...`);
-                     
-                     for (const edit of result.edits) {
-                         // PRE-FIX: Resolve path against workspace if it looks relative
-                         let filePath = edit.file_path;
-                         if (this.workspacePath && window.electronAPI.resolvePath && !filePath.includes(':') && !filePath.startsWith('/')) {
-                             // It's likely relative, force it to be inside workspace
-                             filePath = window.electronAPI.resolvePath(this.workspacePath, filePath);
-                             console.log(`Resolved agent path ${edit.file_path} -> ${filePath}`);
-                             edit.file_path = filePath; // Update the edit object itself
-                         }
+                    this.addAIMessage('ai', `I've proposed changes for ${result.edits.length} files. Opening them for review...`);
 
-                         // Normalize path immediately to match tab system
-                         filePath = this.normalizePath(filePath);
-                         const fileName = this.getFileNameFromPath(filePath);
-                         
-                         // 1. Ensure Original Content exists
-                         if (!edit.is_new && !edit.original_content) {
-                             try {
-                                 const fs = require('fs');
-                                 if (fs.existsSync(edit.file_path)) {
-                                     edit.original_content = fs.readFileSync(edit.file_path, 'utf-8');
-                                 }
-                             } catch (e) { 
-                                 console.error('Error reading original content:', e); 
-                                 edit.original_content = ''; // Fallback
-                             }
-                         }
+                    for (const edit of result.edits) {
+                        // PRE-FIX: Resolve path against workspace if it looks relative
+                        let filePath = edit.file_path;
+                        if (this.workspacePath && window.electronAPI.resolvePath && !filePath.includes(':') && !filePath.startsWith('/')) {
+                            // It's likely relative, force it to be inside workspace
+                            filePath = window.electronAPI.resolvePath(this.workspacePath, filePath);
+                            console.log(`Resolved agent path ${edit.file_path} -> ${filePath}`);
+                            edit.file_path = filePath; // Update the edit object itself
+                        }
 
-                         // 1.5 Apply Hunks Client-Side (if applicable)
-                         if (edit.hunks && edit.hunks.length > 0 && edit.original_content) {
-                             console.log(`Applying ${edit.hunks.length} hunks to ${fileName}`);
-                             let content = edit.original_content;
-                             let success = true;
-                             
-                             // Sort hunks? Usually they come in order. simple sequential replace should work 
-                             // if search blocks are unique enough.
-                             for (const hunk of edit.hunks) {
-                                  // Normalize newlines in search block to match file system content if needed?
-                                  // Or just rely on string replacement
-                                  if (content.includes(hunk.search)) {
-                                      content = content.replace(hunk.search, hunk.replace);
-                                  } else {
-                                      console.warn(`Hunk failed: Could not find search block in ${fileName}`, hunk.search);
-                                      success = false;
-                                      // TODO: Visual warning?
-                                  }
-                             }
-                             
-                             edit.new_content = content;
-                             edit.patchSuccess = success;
-                         } else if (!edit.new_content && !edit.is_new) {
-                              // If no new_content and no hunks, maybe no changes?
-                              edit.new_content = edit.original_content;
-                         }
-                         
-                         // 2. Pre-configure Tab State for Diff View
-                         // We set this BEFORE openFile so that when openFile calls setActiveTab,
-                         // it renders the Diff View directly, avoiding double-rendering/flashing.
-                         
-                         if (!this.tabs.has(filePath)) {
-                             this.createTab(filePath, fileName);
-                         }
-                         
-                         const tabInfo = this.tabs.get(filePath);
-                         if (tabInfo) {
-                             tabInfo.isDiff = true;
-                             tabInfo.editData = edit;
-                             tabInfo.element.classList.add('review-mode');
-                         }
-                         
-                         // 3. Open the file (updates content and activates tab)
-                         const contentToLoad = edit.is_new ? '' : (edit.original_content || '');
-                         await this.openFile(filePath, contentToLoad, fileName);
-                         
-                         // Note: openFile -> setActiveTab will see isDiff=true and render the Diff Editor.
-                     }
-                     
-                     // activate the first one again to ensure focus on the list
-                     if (result.edits.length > 0) {
-                         this.setActiveTab(result.edits[0].file_path);
-                     }
-                     
+                        // Normalize path immediately to match tab system
+                        filePath = this.normalizePath(filePath);
+                        const fileName = this.getFileNameFromPath(filePath);
+
+                        // 1. Ensure Original Content exists
+                        if (!edit.is_new && !edit.original_content) {
+                            try {
+                                const fs = require('fs');
+                                if (fs.existsSync(edit.file_path)) {
+                                    edit.original_content = fs.readFileSync(edit.file_path, 'utf-8');
+                                }
+                            } catch (e) {
+                                console.error('Error reading original content:', e);
+                                edit.original_content = ''; // Fallback
+                            }
+                        }
+
+                        // 1.5 Apply Hunks Client-Side (if applicable)
+                        if (edit.hunks && edit.hunks.length > 0 && edit.original_content) {
+                            console.log(`Applying ${edit.hunks.length} hunks to ${fileName}`);
+                            let content = edit.original_content;
+                            let success = true;
+
+                            // Sort hunks? Usually they come in order. simple sequential replace should work 
+                            // if search blocks are unique enough.
+                            for (const hunk of edit.hunks) {
+                                // Normalize newlines in search block to match file system content if needed?
+                                // Or just rely on string replacement
+                                if (content.includes(hunk.search)) {
+                                    content = content.replace(hunk.search, hunk.replace);
+                                } else {
+                                    console.warn(`Hunk failed: Could not find search block in ${fileName}`, hunk.search);
+                                    success = false;
+                                    // TODO: Visual warning?
+                                }
+                            }
+
+                            edit.new_content = content;
+                            edit.patchSuccess = success;
+                        } else if (!edit.new_content && !edit.is_new) {
+                            // If no new_content and no hunks, maybe no changes?
+                            edit.new_content = edit.original_content;
+                        }
+
+                        // 2. Pre-configure Tab State for Diff View
+                        // We set this BEFORE openFile so that when openFile calls setActiveTab,
+                        // it renders the Diff View directly, avoiding double-rendering/flashing.
+
+                        if (!this.tabs.has(filePath)) {
+                            this.createTab(filePath, fileName);
+                        }
+
+                        const tabInfo = this.tabs.get(filePath);
+                        if (tabInfo) {
+                            tabInfo.isDiff = true;
+                            tabInfo.editData = edit;
+                            tabInfo.element.classList.add('review-mode');
+                        }
+
+                        // 3. Open the file (updates content and activates tab)
+                        const contentToLoad = edit.is_new ? '' : (edit.original_content || '');
+                        await this.openFile(filePath, contentToLoad, fileName);
+
+                        // Note: openFile -> setActiveTab will see isDiff=true and render the Diff Editor.
+                    }
+
+                    // activate the first one again to ensure focus on the list
+                    if (result.edits.length > 0) {
+                        this.setActiveTab(result.edits[0].file_path);
+                    }
+
                 } else {
-                     this.addAIMessage('ai', `Analyzed context but found no code changes needed.`);
+                    this.addAIMessage('ai', `Analyzed context but found no code changes needed.`);
                 }
             } else {
-                 this.addAIMessage('ai', `**Error executing workflow:** ${result.error}`);
+                this.addAIMessage('ai', `**Error executing workflow:** ${result.error}`);
             }
-            
+
         } catch (error) {
-             this.hideAITypingIndicator();
-             console.error('Workflow error:', error);
-             this.addAIMessage('ai', `**Workflow Error:** ${error.message}`);
+            this.hideAITypingIndicator();
+            console.error('Workflow error:', error);
+            this.addAIMessage('ai', `**Workflow Error:** ${error.message}`);
         }
     }
 
     showEditPreview(edits) {
         this.pendingEdits = edits;
-        
+
         // Remove existing review panel if any
         const existingPanel = document.querySelector('.review-panel');
         if (existingPanel) existingPanel.remove();
-        
+
         const messages = document.getElementById('ai-chat-messages');
-        
+
         const panel = document.createElement('div');
         panel.className = 'review-panel';
-        
+
         let fileListHtml = '';
         edits.forEach((edit, index) => {
             const fileName = this.getFileNameFromPath(edit.file_path);
             const status = edit.is_new ? 'New' : 'Modified';
             const statusClass = edit.is_new ? 'status-new' : 'status-modified';
-            
+
             fileListHtml += `
                 <div class="review-file-item" onclick="codeEditor.showDiff(${index})">
                     <i class="fas ${this.getFileIcon(fileName)}"></i>
@@ -2230,7 +2263,7 @@ class CodeEditor {
                 </div>
             `;
         });
-        
+
         panel.innerHTML = `
             <div class="review-header">
                 <div class="review-title">
@@ -2249,7 +2282,7 @@ class CodeEditor {
                 ${fileListHtml}
             </div>
         `;
-        
+
         messages.appendChild(panel);
         messages.scrollTop = messages.scrollHeight;
     }
@@ -2257,7 +2290,7 @@ class CodeEditor {
     async showDiff(editIndex) {
         const edit = this.pendingEdits[editIndex];
         if (!edit) return;
-        
+
         // 1. Get Original Content
         let originalContent = '';
         if (!edit.is_new) {
@@ -2269,10 +2302,10 @@ class CodeEditor {
                 console.warn('Could not read original file for diff:', e);
             }
         }
-        
+
         const modifiedContent = edit.new_content;
         const language = this.getLanguageFromExtension(this.getFileNameFromPath(edit.file_path));
-        
+
         // 2. Setup Diff Editor UI
         let diffContainer = document.getElementById('diff-editor-container');
         if (!diffContainer) {
@@ -2290,29 +2323,29 @@ class CodeEditor {
             `;
             document.body.appendChild(diffContainer);
         }
-        
+
         diffContainer.style.display = 'flex';
-        
+
         // 3. Initialize Monaco Diff Editor
         if (this.diffEditor) {
             this.diffEditor.dispose();
         }
-        
+
         require(['vs/editor/editor.main'], () => {
-             const originalModel = monaco.editor.createModel(originalContent, language);
-             const modifiedModel = monaco.editor.createModel(modifiedContent, language);
-             
-             this.diffEditor = monaco.editor.createDiffEditor(document.getElementById('diff-monaco'), {
-                 theme: 'vs-dark',
-                 readOnly: true,
-                 originalEditable: false,
-                 automaticLayout: true
-             });
-             
-             this.diffEditor.setModel({
-                 original: originalModel,
-                 modified: modifiedModel
-             });
+            const originalModel = monaco.editor.createModel(originalContent, language);
+            const modifiedModel = monaco.editor.createModel(modifiedContent, language);
+
+            this.diffEditor = monaco.editor.createDiffEditor(document.getElementById('diff-monaco'), {
+                theme: 'vs-dark',
+                readOnly: true,
+                originalEditable: false,
+                automaticLayout: true
+            });
+
+            this.diffEditor.setModel({
+                original: originalModel,
+                modified: modifiedModel
+            });
         });
     }
 
@@ -2329,33 +2362,33 @@ class CodeEditor {
 
     async acceptEdits() {
         if (!this.pendingEdits || this.pendingEdits.length === 0) return;
-        
+
         // Remove review panel
         const panel = document.querySelector('.review-panel');
         if (panel) panel.remove();
-        
+
         this.closeDiffView();
-        
+
         await this.applyAllEdits(this.pendingEdits);
         this.pendingEdits = [];
     }
 
     async applyAllEdits(edits) {
         if (!edits || edits.length === 0) return;
-        
+
         // Show progress?
         this.showNotification(`Applying ${edits.length} edits...`, 'info');
-        
+
         for (const edit of edits) {
             await this.applySingleEdit(edit);
         }
-        
+
         this.showNotification('All edits applied successfully', 'success');
-        
+
         // Auto-reindex after changes
         this.indexCodebase();
     }
-    
+
     rejectEdits() {
         const panel = document.querySelector('.review-panel');
         if (panel) panel.remove();
@@ -2376,7 +2409,7 @@ class CodeEditor {
         this.showNotification('Indexing codebase...', 'info');
         try {
             const result = await window.electronAPI.indexCodebase(this.workspacePath);
-            
+
             if (result.success) {
                 this.showNotification(`Indexed ${result.files} files`, 'success');
             } else {
@@ -2469,7 +2502,7 @@ class CodeEditor {
         button.style.border = 'none';
         button.style.boxShadow = '0 4px 15px rgba(0, 255, 255, 0.2)';
         button.style.transition = 'all 0.3s ease';
-        
+
         button.onclick = async () => {
             button.disabled = true;
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';

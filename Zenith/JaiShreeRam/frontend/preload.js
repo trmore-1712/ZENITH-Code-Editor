@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://127.0.0.1:5000/api';
 contextBridge.exposeInMainWorld('electronAPI', {
     windowControl: (action) => ipcRenderer.invoke('window-control', action),
     invoke: (channel, data) => ipcRenderer.invoke(channel, data),
-    
+
     saveFile: (data) => ipcRenderer.invoke('save-file', data),
     createFile: (data) => ipcRenderer.invoke('create-file', data),
     createFolder: (data) => ipcRenderer.invoke('create-folder', data),
@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteFile: (data) => ipcRenderer.invoke('delete-file', data),
     getDirectoryFiles: (dirPath) => ipcRenderer.invoke('get-directory-files', dirPath),
     runCode: (data) => ipcRenderer.invoke('run-code', data),
-    
+
     resolvePath: (basePath, relativePath) => {
         try {
             const path = require('path');
@@ -52,29 +52,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     getFolderStructure: async (folderPath) => {
         return new Promise((resolve, reject) => {
             try {
                 const fs = require('fs');
                 const path = require('path');
-                
+
                 const readDirRecursive = (dir) => {
                     const items = [];
                     const files = fs.readdirSync(dir);
                     const sortedFiles = files.sort((a, b) => {
                         const statA = fs.statSync(path.join(dir, a));
                         const statB = fs.statSync(path.join(dir, b));
-                        
+
                         if (statA.isDirectory() && !statB.isDirectory()) return -1;
                         if (!statA.isDirectory() && statB.isDirectory()) return 1;
                         return a.localeCompare(b);
                     });
-                    
+
                     sortedFiles.forEach(file => {
                         const filePath = path.join(dir, file);
                         const stat = fs.statSync(filePath);
-                        
+
                         if (stat.isDirectory()) {
                             items.push({
                                 name: file,
@@ -85,12 +85,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
                             });
                         } else {
                             const ext = path.extname(file).toLowerCase();
-                            const textExtensions = ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm', 
-                                                  '.css', '.scss', '.sass', '.less', '.py', '.json', 
-                                                  '.md', '.txt', '.xml', '.yaml', '.yml', '.java', 
-                                                  '.c', '.cpp', '.h', '.hpp', '.cs', '.php', '.rb', 
-                                                  '.go', '.rs', '.sql', '.vue', '.svelte'];
-                            
+                            const textExtensions = ['.js', '.ts', '.jsx', '.tsx', '.html', '.htm',
+                                '.css', '.scss', '.sass', '.less', '.py', '.json',
+                                '.md', '.txt', '.xml', '.yaml', '.yml', '.java',
+                                '.c', '.cpp', '.h', '.hpp', '.cs', '.php', '.rb',
+                                '.go', '.rs', '.sql', '.vue', '.svelte'];
+
                             if (textExtensions.includes(ext) || file.startsWith('.')) {
                                 try {
                                     const content = fs.readFileSync(filePath, 'utf-8');
@@ -118,10 +118,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
                             }
                         }
                     });
-                    
+
                     return items;
                 };
-                
+
                 const structure = readDirRecursive(folderPath);
                 resolve(structure);
             } catch (error) {
@@ -129,27 +129,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
         });
     },
-    
+
     showOpenFileDialog: async () => {
         return await ipcRenderer.invoke('show-open-file-dialog');
     },
-    
+
     showOpenFolderDialog: async () => {
         return await ipcRenderer.invoke('show-open-folder-dialog');
     },
-    
+
     getFileStats: async (filePath) => {
         return await ipcRenderer.invoke('get-file-stats', filePath);
     },
-    
+
     watchFile: async (filePath) => {
         return await ipcRenderer.invoke('watch-file', filePath);
     },
-    
+
     unwatchFile: async (filePath) => {
         return await ipcRenderer.invoke('unwatch-file', filePath);
     },
-    
+
     watchFolder: async (folderPath) => {
         return new Promise((resolve, reject) => {
             try {
@@ -165,30 +165,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
                         });
                     }
                 });
-                
+
                 resolve({ success: true });
             } catch (error) {
                 reject(error);
             }
         });
     },
-    
+
     generateCode: async (prompt, context, language = 'python') => {
         try {
             const response = await fetch(`${API_BASE_URL}/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    prompt, 
+                body: JSON.stringify({
+                    prompt,
                     context: context || '',
-                    language 
+                    language
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error generating code:', error);
@@ -199,22 +199,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     explainCode: async (code, language = 'auto') => {
         try {
             const response = await fetch(`${API_BASE_URL}/explain`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
-                    language 
+                    language
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error explaining code:', error);
@@ -225,23 +225,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     debugCode: async (code, language = 'auto', errorMessage = '') => {
         try {
             const response = await fetch(`${API_BASE_URL}/debug`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     language,
-                    error_message: errorMessage 
+                    error_message: errorMessage
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error debugging code:', error);
@@ -253,23 +253,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     optimizeCode: async (code, language = 'auto', optimizationType = 'performance') => {
         try {
             const response = await fetch(`${API_BASE_URL}/optimize`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     language,
-                    optimization_type: optimizationType 
+                    optimization_type: optimizationType
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error optimizing code:', error);
@@ -281,23 +281,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     chat: async (message, history = [], context = {}) => {
         try {
             const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     message,
                     history,
-                    context 
+                    context
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error chatting with AI:', error);
@@ -309,23 +309,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     writeTests: async (code, language = 'auto', testFramework = '') => {
         try {
             const response = await fetch(`${API_BASE_URL}/test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     language,
-                    test_framework: testFramework 
+                    test_framework: testFramework
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error writing tests:', error);
@@ -337,23 +337,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     analyzeCode: async (code, language = 'auto', analysisType = 'comprehensive') => {
         try {
             const response = await fetch(`${API_BASE_URL}/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     language,
-                    analysis_type: analysisType 
+                    analysis_type: analysisType
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error analyzing code:', error);
@@ -365,23 +365,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     convertCode: async (code, sourceLanguage = 'auto', targetLanguage = 'python') => {
         try {
             const response = await fetch(`${API_BASE_URL}/convert`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     source_language: sourceLanguage,
-                    target_language: targetLanguage 
+                    target_language: targetLanguage
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error converting code:', error);
@@ -393,23 +393,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     documentCode: async (code, language = 'auto', documentationStyle = 'comprehensive') => {
         try {
             const response = await fetch(`${API_BASE_URL}/document`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     code,
                     language,
-                    documentation_style: documentationStyle 
+                    documentation_style: documentationStyle
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error documenting code:', error);
@@ -422,21 +422,110 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
+    generateDocumentation: async (code, context) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/document/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, context, filename: 'documentation.pdf' })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || response.statusText);
+            }
+
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            return { success: true, data: arrayBuffer };
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    getProjectContent: async (folderPath) => {
+        return new Promise((resolve) => {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                let context = '';
+                const MAX_CHARS = 30000;
+                let totalChars = 0;
+
+                const processDir = (dir) => {
+                    if (totalChars >= MAX_CHARS) return;
+
+                    const files = fs.readdirSync(dir);
+                    // Skip node_modules, .git, venv, etc.
+                    if (dir.includes('node_modules') || dir.includes('.git') || dir.includes('.venv') || dir.includes('__pycache__')) return;
+
+                    for (const file of files) {
+                        if (totalChars >= MAX_CHARS) break;
+
+                        const filePath = path.join(dir, file);
+                        const stat = fs.statSync(filePath);
+
+                        if (stat.isDirectory()) {
+                            processDir(filePath);
+                        } else {
+                            const ext = path.extname(file).toLowerCase();
+                            const allowedExts = ['.js', '.py', '.html', '.css', '.md', '.json', '.java', '.cpp', '.sql'];
+                            if (allowedExts.includes(ext)) {
+                                try {
+                                    let content = fs.readFileSync(filePath, 'utf-8');
+
+                                    // Truncate individual huge files
+                                    if (content.length > 5000) {
+                                        content = content.substring(0, 5000) + '\n...[File Truncated]...';
+                                    }
+
+                                    const relativePath = path.relative(folderPath, filePath);
+                                    const fileBlock = `\n\n--- File: ${relativePath} ---\n${content}`;
+
+                                    if (totalChars + fileBlock.length > MAX_CHARS) {
+                                        const remaining = MAX_CHARS - totalChars;
+                                        if (remaining > 100) {
+                                            context += fileBlock.substring(0, remaining) + '\n...[Context Limit Reached]...';
+                                            totalChars += remaining;
+                                        }
+                                        return;
+                                    }
+
+                                    context += fileBlock;
+                                    totalChars += fileBlock.length;
+                                } catch (e) {
+                                    console.warn(`Skipping file ${file}: ${e.message}`);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                processDir(folderPath);
+                resolve(context);
+            } catch (error) {
+                console.error('Error reading project content:', error);
+                resolve('');
+            }
+        });
+    },
+
     multiFileEdit: async (task, files) => {
         try {
             const response = await fetch(`${API_BASE_URL}/agent/edit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     task,
                     files
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error in multi-file edit:', error);
@@ -446,18 +535,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     checkBackendHealth: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/health`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data = await response.json();
             return {
                 success: true,
@@ -475,7 +564,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     analyzeFiles: async (files, analysisType = 'structure') => {
         try {
             const formData = new FormData();
@@ -483,16 +572,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 formData.append('files', file);
             });
             formData.append('analysis_type', analysisType);
-            
+
             const response = await fetch(`${API_BASE_URL}/files/analyze`, {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error analyzing files:', error);
@@ -503,7 +592,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     indexCodebase: async (path) => {
         try {
             const response = await fetch(`${API_BASE_URL}/rag/index`, {
@@ -511,11 +600,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error indexing codebase:', error);
@@ -525,18 +614,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     checkOllamaHealth: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/ollama/health`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error checking Ollama health:', error);
@@ -548,7 +637,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     pullOllama: async (modelName = 'codellama:7b') => {
         try {
             const response = await fetch(`${API_BASE_URL}/ollama/pull`, {
@@ -556,11 +645,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: modelName })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error pulling Ollama model:', error);
@@ -571,59 +660,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }
     },
-    
+
     onFileOpened: (callback) => {
         ipcRenderer.on('file-opened', (event, data) => callback(data));
     },
-    
+
     onFolderOpened: (callback) => {
         ipcRenderer.on('folder-opened', (event, data) => callback(data));
     },
-    
+
     onFileSaved: (callback) => {
         ipcRenderer.on('file-saved', (event, data) => callback(data));
     },
-    
+
     onFileCreated: (callback) => {
         ipcRenderer.on('file-created', (event, data) => callback(data));
     },
-    
+
     onFolderCreated: (callback) => {
         ipcRenderer.on('folder-created', (event, data) => callback(data));
     },
-    
+
     onFileRenamed: (callback) => {
         ipcRenderer.on('file-renamed', (event, data) => callback(data));
     },
-    
+
     onFileDeleted: (callback) => {
         ipcRenderer.on('file-deleted', (event, data) => callback(data));
     },
-    
+
     onFileChanged: (callback) => {
         ipcRenderer.on('file-changed', (event, data) => callback(data));
     },
-    
+
     onMenuAction: (callback) => {
         ipcRenderer.on('menu-action', (event, action) => callback(action));
     },
-    
+
     onAIAction: (callback) => {
         ipcRenderer.on('ai-action', (event, action) => callback(action));
     },
-    
+
     onWindowAction: (callback) => {
         ipcRenderer.on('window-action', (event, action) => callback(action));
     },
-    
+
     onTerminalAction: (callback) => {
         ipcRenderer.on('terminal-action', (event, action) => callback(action));
     },
-    
+
     onFileChangedExternally: (callback) => {
         ipcRenderer.on('file-changed-externally', (event, data) => callback(data));
     },
-    
+
     sendEditorContent: (content) => {
         ipcRenderer.send('editor-content', content);
     }
