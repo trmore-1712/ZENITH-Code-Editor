@@ -39,6 +39,7 @@ class CodeEditor {
         this.setupExtensionsSearch();
         this.setupLivePreview();
         this.setupResizers();
+        this.setupTerminal();
     }
 
     setupResizers() {
@@ -126,6 +127,170 @@ class CodeEditor {
                 if (this.editor) this.editor.layout();
             }
         });
+    }
+
+    setupTerminal() {
+        const terminalContainer = document.getElementById('terminal-content');
+        if (!terminalContainer) return;
+
+        // Clear existing content (remove mock HTML)
+        terminalContainer.innerHTML = '';
+        terminalContainer.style.background = '#1e1e1e';
+        terminalContainer.style.padding = '0'; // Remove padding for xterm
+
+        if (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
+            console.error('xterm.js or xterm-addon-fit not loaded');
+            terminalContainer.innerHTML = '<div style="padding: 20px; color: #f88;">Error: Terminal libraries not loaded. Please check internet connection.</div>';
+            return;
+        }
+
+        // Initialize xterm
+        this.term = new Terminal({
+            cursorBlink: true,
+            theme: {
+                background: '#1e1e1e',
+                foreground: '#cccccc',
+                cursor: '#cccccc',
+                selection: '#264f78'
+            },
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 13,
+            lineHeight: 1.2,
+            convertEol: true // Treat \n as \r\n
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        this.term.loadAddon(fitAddon);
+
+        this.term.open(terminalContainer);
+
+        // Initial fit and create
+        setTimeout(async () => {
+            fitAddon.fit();
+            if (this.term && this.term.cols) {
+                try {
+                    const result = await window.electronAPI.terminalCreate({
+                        cols: this.term.cols,
+                        rows: this.term.rows,
+                        cwd: this.workspacePath
+                    });
+                    if (result && !result.success) {
+                        this.term.write(`\r\n\x1b[31mFailed to start shell: ${result.error}\x1b[0m\r\n`);
+                        this.term.write('\x1b[33mEnsure node-pty is installed or Visual Studio Build Tools are available.\x1b[0m\r\n');
+                    }
+                } catch (e) {
+                    this.term.write(`\r\n\x1b[31mError connecting to terminal: ${e.message}\x1b[0m\r\n`);
+                }
+            }
+        }, 100);
+
+        // Connect to backend
+        this.term.onData(data => {
+            window.electronAPI.terminalWrite(data);
+        });
+
+        window.electronAPI.onTerminalIncoming(data => {
+            this.term.write(data);
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            if (this.term) window.electronAPI.terminalResize(this.term.cols, this.term.rows);
+        });
+
+        // Also fit on terminal panel resize
+        const terminalPanel = document.getElementById('terminal-panel');
+        if (terminalPanel) {
+            const observer = new ResizeObserver(() => {
+                fitAddon.fit();
+                if (this.term) window.electronAPI.terminalResize(this.term.cols, this.term.rows);
+            });
+            observer.observe(terminalPanel);
+        }
+
+        // Run Button
+        const runBtn = document.getElementById('run-code-btn');
+        if (runBtn) {
+            runBtn.addEventListener('click', () => this.runCurrentFile());
+        }
+
+        // Expose term for other methods
+        this.fitAddon = fitAddon;
+    }
+
+    async runCurrentFile() {
+        if (!this.currentFile) {
+            this.term.write('\r\n\x1b[33mPlease save the file before running.\x1b[0m\r\n');
+            return;
+        }
+
+        // Save file first
+        await window.electronAPI.saveFile({
+            filePath: this.currentFile,
+            content: this.editor.getValue()
+        });
+
+        const isWindows = navigator.platform.indexOf('Win') > -1;
+        // Paths are normalized to use '/' in this app
+        const parts = this.currentFile.split('/');
+        const fileName = parts.pop();
+        const dir = parts.join('/');
+
+        // Change to file directory first
+        const cdCmd = `cd "${dir}"`;
+        window.electronAPI.terminalWrite(cdCmd + '\r');
+
+        const ext = fileName.split('.').pop().toLowerCase();
+        let cmd = '';
+
+        if (ext === 'py') {
+            cmd = isWindows ? `python "${fileName}"` : `python3 "${fileName}"`;
+        } else if (ext === 'js') {
+            cmd = `node "${fileName}"`;
+        } else if (ext === 'java') {
+            const className = fileName.substring(0, fileName.lastIndexOf('.'));
+            if (isWindows) {
+                cmd = `javac "${fileName}"; if ($?) { java "${className}" }`;
+            } else {
+                cmd = `javac "${fileName}" && java "${className}"`;
+            }
+        } else if (ext === 'html') {
+            this.toggleLivePreview();
+            this.updateLivePreview();
+            return;
+        } else if (ext === 'c') {
+            const outFile = isWindows ? 'a.exe' : './a.out';
+            if (isWindows) {
+                cmd = `gcc "${fileName}" -o ${outFile}; if ($?) { .\\${outFile} }`;
+            } else {
+                cmd = `gcc "${fileName}" -o ${outFile} && ${outFile}`;
+            }
+        } else if (ext === 'cpp') {
+            const outFile = isWindows ? 'a.exe' : './a.out';
+            if (isWindows) {
+                cmd = `g++ "${fileName}" -o ${outFile}; if ($?) { .\\${outFile} }`;
+            } else {
+                cmd = `g++ "${fileName}" -o ${outFile} && ${outFile}`;
+            }
+        } else {
+            this.term.write(`\r\n\x1b[33mRunning files of type .${ext} is not explicitly supported. send command manually.\x1b[0m\r\n`);
+            return;
+        }
+
+        // Show terminal if hidden
+        const terminalPanel = document.getElementById('terminal-panel');
+        if (terminalPanel && terminalPanel.offsetHeight < 50) {
+            terminalPanel.style.height = '200px';
+            terminalPanel.classList.add('visible');
+            if (this.fitAddon) this.fitAddon.fit();
+        }
+
+        // Send command with a slight delay to ensure cd executes
+        setTimeout(() => {
+            this.term.write(`\r\n\x1b[32m> Executing: ${cmd}\x1b[0m\r\n`);
+            window.electronAPI.terminalWrite(cmd + '\r');
+        }, 50);
     }
 
     async loadMonacoEditor() {
@@ -2048,6 +2213,11 @@ class CodeEditor {
         this.renderFileTree();
         this.updateWorkspaceInfo(folderPath);
 
+        // Sync terminal directory
+        if (this.term) {
+            window.electronAPI.terminalWrite(`cd "${folderPath}"\r`);
+        }
+
         // Start watching folder
         this.watchWorkspaceFolder(folderPath);
 
@@ -2114,36 +2284,7 @@ class CodeEditor {
         }
     }
 
-    async runCurrentFile() {
-        if (!this.currentFile) {
-            this.showNotification('No file to run', 'warning');
-            return;
-        }
 
-        const language = this.getLanguageFromExtension(this.currentFile);
-
-        this.showTerminal();
-        this.addTerminalOutput(`$ Running ${this.currentFile}...`);
-
-        try {
-            const result = await window.electronAPI.runCode({
-                filePath: this.currentFile,
-                language: language
-            });
-
-            if (result.success) {
-                if (result.output.stdout) {
-                    this.addTerminalOutput(result.output.stdout);
-                } else {
-                    this.addTerminalOutput('Program executed successfully');
-                }
-            } else {
-                this.addTerminalOutput(`Error: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            this.addTerminalOutput(`Execution error: ${error.message}`, 'error');
-        }
-    }
 
     toggleAIPanel() {
         const aiPanel = document.getElementById('ai-panel');

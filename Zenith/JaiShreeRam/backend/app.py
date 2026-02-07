@@ -134,7 +134,8 @@ def get_extensions():
         
         headers = {
             "Content-Type": "application/json",
-            "Accept": "application/json;api-version=3.0-preview.1"
+            "Accept": "application/json;api-version=3.0-preview.1",
+            "User-Agent": "VSCode/1.85.1 (Code-Editor-Agent)"
         }
         
         response = requests.post(
@@ -142,6 +143,10 @@ def get_extensions():
             json=payload,
             headers=headers
         )
+
+        if response.status_code != 200:
+             logger.error(f"Marketplace API Error: {response.status_code} - {response.text}")
+             return jsonify({"error": "Failed to fetch extensions from Marketplace"}), response.status_code
         
         return jsonify(response.json())
     except Exception as e:

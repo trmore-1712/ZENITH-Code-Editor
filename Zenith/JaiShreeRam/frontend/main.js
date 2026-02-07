@@ -1,10 +1,19 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { spawn } = require('child_process');
 
 let mainWindow;
 let fileWatchers = new Map();
+let ptyProcess = null;
+let ptyModule = null;
+
+try {
+  ptyModule = require('node-pty');
+} catch (e) {
+  console.warn('node-pty not found. Terminal features will be limited.', e);
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -617,6 +626,56 @@ ipcMain.handle('agent-edit', async (event, data) => {
   } catch (error) {
     console.error('Error in agent-edit:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Terminal Handlers
+ipcMain.handle('terminal:create', (event, options) => {
+  if (!ptyModule) {
+    return { success: false, error: 'node-pty module not found. Please install build tools.' };
+  }
+
+  if (ptyProcess) {
+    try {
+      ptyProcess.kill();
+    } catch (e) {
+      console.error('Error killing old terminal process:', e);
+    }
+  }
+
+  try {
+    const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
+
+    ptyProcess = ptyModule.spawn(shell, [], {
+      name: 'xterm-color',
+      cols: options.cols || 80,
+      rows: options.rows || 24,
+      cwd: options.cwd || process.cwd(),
+      env: process.env
+    });
+
+    ptyProcess.on('data', (data) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('terminal:incoming', data);
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating terminal:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('terminal:write', (event, data) => {
+  if (ptyProcess) {
+    ptyProcess.write(data);
+  }
+});
+
+ipcMain.handle('terminal:resize', (event, { cols, rows }) => {
+  if (ptyProcess) {
+    ptyProcess.resize(cols, rows);
   }
 });
 

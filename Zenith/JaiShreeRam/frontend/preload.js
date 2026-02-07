@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getDirectoryFiles: (dirPath) => ipcRenderer.invoke('get-directory-files', dirPath),
     runCode: (data) => ipcRenderer.invoke('run-code', data),
 
+    // Terminal API
+    terminalCreate: (options) => ipcRenderer.invoke('terminal:create', options),
+    terminalWrite: (data) => ipcRenderer.invoke('terminal:write', data),
+    terminalResize: (cols, rows) => ipcRenderer.invoke('terminal:resize', { cols, rows }),
+    onTerminalIncoming: (callback) => ipcRenderer.on('terminal:incoming', (event, data) => callback(data)),
+
     resolvePath: (basePath, relativePath) => {
         try {
             const path = require('path');
