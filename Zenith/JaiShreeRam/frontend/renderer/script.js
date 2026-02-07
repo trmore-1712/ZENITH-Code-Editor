@@ -30,11 +30,102 @@ class CodeEditor {
     async init() {
         await this.loadMonacoEditor();
         this.setupEventListeners();
+        this.setupActivityBar();
         this.setupElectronHandlers();
         this.setupDefaultWorkspace();
         this.checkBackendHealth();
         this.setupAutoSave();
         this.setupFileSystemWatchers();
+        this.setupExtensionsSearch();
+        this.setupLivePreview();
+        this.setupResizers();
+    }
+
+    setupResizers() {
+        // Sidebar Resizer (Drag right edge of sidebar)
+        this.initResizer('resizer-sidebar', (dx, dy) => {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                const newWidth = Math.max(150, Math.min(600, sidebar.offsetWidth + dx));
+                sidebar.style.width = `${newWidth}px`;
+                sidebar.style.flex = `0 0 ${newWidth}px`; // Important for flex container
+            }
+        });
+
+        // AI Panel Resizer (Drag left edge of AI panel)
+        this.initResizer('resizer-ai', (dx, dy) => {
+            const aiPanel = document.getElementById('ai-panel');
+            if (aiPanel) {
+                // Dragging left means dx is negative, so width increases
+                const newWidth = Math.max(250, Math.min(600, aiPanel.offsetWidth - dx));
+                aiPanel.style.width = `${newWidth}px`;
+                aiPanel.style.flex = `0 0 ${newWidth}px`;
+            }
+        });
+
+        // Terminal Resizer (Drag top edge of terminal)
+        this.initResizer('resizer-terminal', (dx, dy) => {
+            const terminal = document.getElementById('terminal-panel');
+            if (terminal) {
+                // Dragging up means dy is negative, so height increases
+                const newHeight = Math.max(100, Math.min(600, terminal.offsetHeight - dy));
+                terminal.style.height = `${newHeight}px`;
+                // Terminal might be flex-grow, so we might need to set explicit height
+            }
+        });
+
+        // Live Preview Resizer (Drag between editor and preview)
+        this.initResizer('resizer-preview', (dx, dy) => {
+            const editorContainer = document.getElementById('editor-container-inner');
+            if (editorContainer) {
+                // Dragging right increases editor width
+                const newWidth = Math.max(200, editorContainer.offsetWidth + dx);
+                editorContainer.style.flex = `0 0 ${newWidth}px`;
+            }
+        });
+    }
+
+    initResizer(id, callback) {
+        const resizer = document.getElementById(id);
+        if (!resizer) return;
+
+        let startX, startY;
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            document.body.style.userSelect = 'none'; // Prevent text selection
+            resizer.classList.add('active');
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            // Calculate delta
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            // Update start position for next frame
+            startX = e.clientX;
+            startY = e.clientY;
+
+            // Perform resize
+            callback(dx, dy);
+
+            // Layout editor if needed
+            if (this.editor) this.editor.layout();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.userSelect = '';
+                resizer.classList.remove('active');
+                if (this.editor) this.editor.layout();
+            }
+        });
     }
 
     async loadMonacoEditor() {
@@ -78,6 +169,7 @@ class CodeEditor {
                 this.editor.onDidChangeModelContent(() => {
                     this.updateOutline();
                     this.updateTabStatus();
+                    this.updateLivePreview();
                 });
 
                 this.editor.onDidChangeCursorPosition((e) => {
@@ -337,6 +429,433 @@ class CodeEditor {
         console.log('Event listeners setup complete');
     }
 
+    setupActivityBar() {
+        const activityItems = document.querySelectorAll('.activity-item');
+        const views = document.querySelectorAll('.sidebar-view');
+
+        activityItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (item.classList.contains('spacer')) return;
+
+                if (item.id === 'nav-settings') {
+                    this.showNotification('Settings not implemented yet', 'info');
+                    return;
+                }
+
+                const id = item.id;
+
+                // Remove active class from all items
+                activityItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                // Switch View
+                views.forEach(view => {
+                    view.classList.remove('active');
+                    view.style.display = 'none';
+                });
+
+                let viewId = '';
+                if (id === 'nav-explorer') viewId = 'view-explorer';
+                else if (id === 'nav-github') viewId = 'view-github';
+                else if (id === 'nav-algo') viewId = 'view-algo';
+                else if (id === 'nav-extensions') viewId = 'view-extensions';
+                else if (id === 'nav-search') viewId = 'view-extensions';
+
+                const targetView = document.getElementById(viewId);
+                if (targetView) {
+                    targetView.classList.add('active');
+                    targetView.style.display = 'flex';
+
+                    // Load extensions if opening that view
+                    if (viewId === 'view-extensions') {
+                        this.loadExtensions();
+                    }
+                }
+            });
+        });
+
+        const ghLoginBtn = document.getElementById('gh-login-btn');
+        if (ghLoginBtn) {
+            ghLoginBtn.addEventListener('click', () => {
+                const token = document.getElementById('gh-token').value;
+                if (token) {
+                    this.ghToken = token;
+                    localStorage.setItem('ghToken', token);
+                    this.showNotification('GitHub Authentication Successful', 'success');
+                } else {
+                    this.showNotification('Please enter a token', 'error');
+                }
+            });
+            // Load saved token
+            const savedToken = localStorage.getItem('ghToken');
+            if (savedToken) {
+                this.ghToken = savedToken;
+                document.getElementById('gh-token').value = savedToken;
+            }
+        }
+
+        // Clone
+        const cloneBtn = document.getElementById('gh-clone-btn');
+        if (cloneBtn) {
+            cloneBtn.addEventListener('click', async () => {
+                const repoUrl = prompt('Enter Repository URL (https):');
+                if (!repoUrl) return;
+
+                const { canceled, filePaths } = await window.electronAPI.showOpenFolderDialog();
+                if (canceled || filePaths.length === 0) return;
+
+                const targetParent = filePaths[0];
+                const repoName = repoUrl.split('/').pop().replace('.git', '');
+                const targetPath = await window.electronAPI.resolvePath(targetParent, repoName);
+
+                this.showNotification(`Cloning ${repoName}...`, 'info');
+
+                const result = await window.electronAPI.gitClone(repoUrl, targetPath, this.ghToken);
+
+                if (result.success) {
+                    this.showNotification('Cloned successfully!', 'success');
+                    this.openFolder(targetPath);
+                } else {
+                    this.showNotification(`Clone failed: ${result.error}`, 'error');
+                }
+            });
+        }
+
+        // Commit and Push/Pull
+        const pushBtn = document.getElementById('gh-push');
+        if (pushBtn) {
+            pushBtn.addEventListener('click', async () => {
+                if (!this.workspacePath) return this.showNotification('No workspace open', 'warning');
+                this.showNotification('Pushing changes...', 'info');
+                const result = await window.electronAPI.gitPush(this.workspacePath, null, this.ghToken);
+                if (result.success) {
+                    this.showNotification('Pushed successfully', 'success');
+                } else {
+                    this.showNotification(`Push failed: ${result.error}`, 'error');
+                }
+            });
+        }
+
+        // Algo Visualizer Button
+        const vizRunBtn = document.querySelector('#view-algo .fa-play');
+        if (vizRunBtn) {
+            vizRunBtn.parentElement.title = "Visualize Algorithm";
+            vizRunBtn.parentElement.style.cursor = "pointer";
+            vizRunBtn.parentElement.addEventListener('click', () => {
+                this.visualizeAlgorithm();
+            });
+        }
+
+        // Close Visualization
+        const closeVizBtn = document.getElementById('close-viz-btn');
+        if (closeVizBtn) {
+            closeVizBtn.addEventListener('click', () => {
+                document.getElementById('visualization-panel').style.display = 'none';
+                document.getElementById('monaco-wrapper').style.display = 'block';
+            });
+        }
+
+        const pullBtn = document.getElementById('gh-pull');
+        if (pullBtn) {
+            pullBtn.addEventListener('click', async () => {
+                if (!this.workspacePath) return this.showNotification('No workspace open', 'warning');
+                this.showNotification('Pulling changes...', 'info');
+                const result = await window.electronAPI.gitPull(this.workspacePath);
+                if (result.success) {
+                    this.showNotification('Pulled successfully', 'success');
+                    this.refreshFileTree();
+                } else {
+                    this.showNotification(`Pull failed: ${result.error}`, 'error');
+                }
+            });
+        }
+
+        // Commit logic is bound to a button? The UI shows textarea and then buttons.
+        // It seems the "Push" button handles just push. But usually people commit then push.
+        // Let's add a specialized Commit button if it exists or reuse one.
+        // The UI has "Commit & Push" label but separate buttons. 
+        // Let's make "Push" do Commit + Push if there is a message? 
+        // Or adds a "Commit" button in the future.
+        // For now, I'll add a separate Event Listener for the textarea to allow Ctrl+Enter to commit?
+        // Or better, let's create a dedicated Commit function and a button if I can edit HTML.
+        // Currently I am editing JS. The existing buttons are push, pull, fetch, branch.
+        // Let's assume the user wants to Commit AND Push with the Push button if a message is present.
+
+        if (pushBtn) {
+            // Let's override the previous listener to include commit logic
+            const newPushBtn = pushBtn.cloneNode(true);
+            pushBtn.parentNode.replaceChild(newPushBtn, pushBtn);
+
+            newPushBtn.addEventListener('click', async () => {
+                if (!this.workspacePath) return this.showNotification('No workspace open', 'warning');
+
+                const msg = document.getElementById('gh-commit-msg').value.trim();
+
+                if (msg) {
+                    this.showNotification('Committing...', 'info');
+                    const commitResult = await window.electronAPI.gitCommit(this.workspacePath, msg);
+                    if (!commitResult.success) {
+                        return this.showNotification(`Commit failed: ${commitResult.error}`, 'error');
+                    }
+                    this.showNotification('Committed. Pushing...', 'info');
+                    document.getElementById('gh-commit-msg').value = ''; // Clear message
+                } else {
+                    this.showNotification('No commit message. Pushing existing commits...', 'info');
+                }
+
+                const result = await window.electronAPI.gitPush(this.workspacePath, null, this.ghToken);
+                if (result.success) {
+                    this.showNotification('Pushed successfully', 'success');
+                } else {
+                    this.showNotification(`Push failed: ${result.error}`, 'error');
+                }
+            });
+        }
+
+        const commitBtn = document.getElementById('gh-commit-btn');
+        if (commitBtn) {
+            commitBtn.addEventListener('click', async () => {
+                if (!this.workspacePath) return this.showNotification('No workspace open', 'warning');
+
+                const msg = document.getElementById('gh-commit-msg').value.trim();
+                if (!msg) {
+                    return this.showNotification('Please enter a commit message', 'warning');
+                }
+
+                this.showNotification('Committing...', 'info');
+                const commitResult = await window.electronAPI.gitCommit(this.workspacePath, msg);
+
+                if (commitResult.success) {
+                    this.showNotification('Committed successfully!', 'success');
+                    document.getElementById('gh-commit-msg').value = '';
+                    this.loadGitHistory();
+                } else {
+                    this.showNotification(`Commit failed: ${commitResult.error}`, 'error');
+                }
+            });
+        }
+
+        const fetchBtn = document.getElementById('gh-fetch');
+        if (fetchBtn) {
+            fetchBtn.addEventListener('click', () => {
+                this.showNotification('Fetch not implemented yet', 'info');
+            });
+        }
+
+        // Auto-load history when switching to Github view
+        const navGithub = document.getElementById('nav-github');
+        if (navGithub) {
+            navGithub.addEventListener('click', () => {
+                if (this.workspacePath) {
+                    this.loadGitHistory();
+                }
+            });
+        }
+    }
+
+    async loadGitHistory() {
+        if (!this.workspacePath) return;
+
+        const historyList = document.getElementById('gh-history-list');
+        if (!historyList) return;
+
+        historyList.innerHTML = '<div class="history-placeholder">Loading history...</div>';
+
+        const result = await window.electronAPI.gitHistory(this.workspacePath);
+
+        if (result.success) {
+            historyList.innerHTML = '';
+            if (result.history.length === 0) {
+                historyList.innerHTML = '<div class="history-placeholder">No history available</div>';
+                return;
+            }
+
+            result.history.forEach(commit => {
+                const item = document.createElement('div');
+                item.className = 'history-item'; // Add CSS for this
+                item.style.padding = '8px';
+                item.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                item.style.cursor = 'pointer';
+
+                item.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 4px;">${commit.message}</div>
+                    <div style="display: flex; justify-content: space-between; color: #888; font-size: 10px;">
+                        <span>${commit.author}</span>
+                        <span>${new Date(commit.date).toLocaleDateString()}</span>
+                    </div>
+                    <div style="color: #666; font-size: 10px; margin-top: 2px;">${commit.short_hash}</div>
+                `;
+
+                item.addEventListener('click', () => {
+                    // TODO: Show commit details/diff
+                    this.showNotification(`Commit ${commit.short_hash} selected (Diff view not implemented)`, 'info');
+                });
+
+                historyList.appendChild(item);
+            });
+        } else {
+            historyList.innerHTML = `<div class="history-placeholder" style="color: #ff5f56;">Error: ${result.error}</div>`;
+        }
+    }
+
+    setupExtensionsSearch() {
+        const searchInput = document.querySelector('#view-extensions .input-dark');
+        if (searchInput) {
+            let timeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    this.loadExtensions(e.target.value);
+                }, 500);
+            });
+        }
+    }
+
+    async loadExtensions(query = '') {
+        const list = document.querySelector('.extensions-list');
+        if (!list) return;
+
+        list.innerHTML = '<div class="extension-item" style="justify-content:center; align-items:center; opacity:0.7; padding: 20px;"><i class="fas fa-circle-notch fa-spin"></i> Loading...</div>';
+
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/extensions?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+
+            // Check if we have results
+            if (data.results && data.results[0] && data.results[0].extensions) {
+                this.renderExtensions(data.results[0].extensions);
+            } else {
+                list.innerHTML = '<div class="extension-item" style="justify-content:center; padding: 20px;">No extensions found</div>';
+            }
+        } catch (error) {
+            console.error('Error loading extensions:', error);
+            list.innerHTML = `<div class="extension-item" style="color:#ff5f56; padding: 20px;">Error: ${error.message}</div>`;
+        }
+    }
+
+    renderExtensions(extensions) {
+        const list = document.querySelector('.extensions-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+
+        extensions.forEach(ext => {
+            const item = document.createElement('div');
+            item.className = 'extension-item';
+
+            // Find icon
+            const version = ext.versions[0];
+            const iconFile = version.files.find(f => f.assetType === 'Microsoft.VisualStudio.Services.Icons.Default') ||
+                version.files.find(f => f.assetType === 'Microsoft.VisualStudio.Services.Icons.Small');
+
+            const iconUrl = iconFile ? iconFile.source : '';
+
+            // Fallback icon
+            const iconHtml = iconUrl
+                ? `<img src="${iconUrl}" class="ext-icon" style="object-fit: contain; width: 42px; height: 42px;">`
+                : `<div class="ext-icon"><i class="fas fa-puzzle-piece"></i></div>`;
+
+            // Meta
+            const publisher = ext.publisher.displayName;
+            // Try to find install count in statistics
+            let installCount = 0;
+            if (ext.statistics) {
+                const stat = ext.statistics.find(s => s.statisticName === 'install');
+                if (stat) installCount = stat.value;
+            }
+
+            item.innerHTML = `
+                <div class="ext-header">
+                    ${iconHtml}
+                    <div class="ext-info">
+                        <div class="ext-name">${ext.displayName}</div>
+                        <div class="ext-desc" title="${ext.shortDescription || ''}">${ext.shortDescription || ''}</div>
+                        <div class="ext-meta">
+                            <span><i class="fas fa-check-circle" style="font-size: 8px;"></i> ${publisher}</span>
+                            <span style="margin-left:8px;"><i class="fas fa-download" style="font-size: 8px;"></i> ${this.formatNumber(installCount)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button class="btn-xs btn-install" onclick="window.codeEditor.installExtension('${ext.extensionId}')">Install</button>
+                    ${version.properties?.find(p => p.key === 'Microsoft.VisualStudio.Services.Links.Learn')
+                    ? `<button class="btn-xs btn-secondary" onclick="window.electronAPI.openExternal('${version.properties.find(p => p.key === 'Microsoft.VisualStudio.Services.Links.Learn').value}')">Docs</button>`
+                    : ''}
+                </div>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    // Helper for large numbers
+    formatNumber(num) {
+        if (!num) return '0';
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        }
+        if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+
+    installExtension(id) {
+        this.showNotification(`Installing extension ${id}... (Mock)`, 'info');
+        setTimeout(() => {
+            this.showNotification(`Extension ${id} installed!`, 'success');
+        }, 1500);
+    }
+
+    setupLivePreview() {
+        const btn = document.getElementById('live-preview-btn');
+        if (btn) {
+            btn.addEventListener('click', () => this.toggleLivePreview());
+        }
+
+        const closeBtn = document.getElementById('close-preview-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.toggleLivePreview());
+        }
+    }
+
+    toggleLivePreview() {
+        const pane = document.getElementById('live-preview-pane');
+        const editorContainer = document.getElementById('editor-container-inner');
+
+        if (!pane || !editorContainer) return;
+
+        if (pane.style.display === 'none') {
+            pane.style.display = 'flex';
+            this.updateLivePreview();
+        } else {
+            pane.style.display = 'none';
+        }
+
+        // Resize editor to fit new layout
+        if (this.editor) {
+            this.editor.layout();
+        }
+    }
+
+    updateLivePreview() {
+        const pane = document.getElementById('live-preview-pane');
+        if (!pane || pane.style.display === 'none') return;
+
+        const frame = document.getElementById('preview-frame');
+        if (!frame || !this.editor) return;
+
+        const content = this.editor.getValue();
+        // Basic HTML structure if missing
+        let html = content;
+        if (!content.trim().toLowerCase().startsWith('<!doctype html') && !content.trim().toLowerCase().startsWith('<html')) {
+            // If it's just a fragment or CSS/JS, maybe wrap it? 
+            // For now, assume user writes full HTML or pieces. 
+            // If file type is not HTML, we could warn or wrap.
+        }
+
+        frame.srcdoc = html;
+    }
+
     setupTabListeners() {
         const tabsContainer = document.getElementById('tabs-container');
         if (tabsContainer) {
@@ -353,6 +872,65 @@ class CodeEditor {
                     }
                 }
             });
+        }
+    }
+
+    async visualizeAlgorithm() {
+        const scratchpad = document.querySelector('.scratchpad-area');
+        if (!scratchpad) return;
+
+        const code = scratchpad.value.trim();
+        if (!code) {
+            this.showNotification('Please enter some algorithm code first', 'warning');
+            return;
+        }
+
+        this.showNotification('Generating visualization... This may take a moment.', 'info');
+
+        // Show panel with loading
+        const panel = document.getElementById('visualization-panel');
+        const wrapper = document.getElementById('monaco-wrapper');
+        const iframe = document.getElementById('viz-frame');
+
+        wrapper.style.display = 'none';
+        panel.style.display = 'flex';
+
+        // Set loading state in iframe
+        const loadingHtml = `
+            <style>
+                body { background: #1e1e1e; color: #ccc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .loader { border: 4px solid #333; border-top: 4px solid #007acc; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+            <div style="text-align: center;">
+                <div class="loader" style="margin: 0 auto 20px;"></div>
+                <div>Generating AI Visualization...</div>
+            </div>
+        `;
+        iframe.srcdoc = loadingHtml;
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/visualize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, language: 'javascript' }) // Assume JS for scratchpad or detect
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Inject the visualization HTML
+                // We use srcdoc to safely isolate it (somewhat) and ensure it renders as a document
+                iframe.srcdoc = data.visualization;
+                this.showNotification('Visualization generated!', 'success');
+            } else {
+                iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Error: ${data.error}</div>`;
+                this.showNotification('Failed to generate visualization', 'error');
+            }
+        } catch (error) {
+            console.error('Visualization error:', error);
+            iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Connection Error: ${error.message}</div>`;
+            this.showNotification('Error connecting to backend', 'error');
         }
     }
 
@@ -2023,6 +2601,56 @@ class CodeEditor {
         // Detect if this is an explicit edit command
         if (message.toLowerCase().startsWith('/edit') || message.toLowerCase().includes('change current file')) {
             // For now, hook into chat, but ideally we parse intent
+        }
+
+        // Git Agent Commands
+        if (message.match(/^(git\s+)?push(\s+code|\s+to\s+github)?/i)) {
+            this.addAIMessage('user', message);
+            input.value = '';
+            this.showAITypingIndicator();
+
+            this.addAIMessage('ai', 'Pushing changes to GitHub...');
+            try {
+                const result = await window.electronAPI.gitPush(this.workspacePath, null, this.ghToken);
+                this.hideAITypingIndicator();
+                if (result.success) {
+                    this.addAIMessage('ai', '✅ Changes pushed successfully!');
+                    this.loadGitHistory();
+                } else {
+                    this.addAIMessage('ai', `❌ Push failed: ${result.error}`);
+                }
+            } catch (e) {
+                this.hideAITypingIndicator();
+                this.addAIMessage('ai', `❌ Error: ${e.message}`);
+            }
+            return;
+        }
+
+        if (message.match(/^(git\s+)?pull(\s+code|\s+from\s+github)?/i)) {
+            this.addAIMessage('user', message);
+            input.value = '';
+            this.showAITypingIndicator();
+
+            this.addAIMessage('ai', 'Pulling changes from GitHub...');
+            try {
+                const result = await window.electronAPI.gitPull(this.workspacePath);
+                this.hideAITypingIndicator();
+                if (result.success) {
+                    this.addAIMessage('ai', '✅ Changes pulled successfully!');
+                    this.refreshFileTree();
+                    this.loadGitHistory();
+                } else {
+                    if (result.is_conflict) {
+                        this.addAIMessage('ai', `⚠️ Merge Conflict detected in:\nGUI-based resolution is recommended.\n\nConflicted files:\n- ${result.conflicts.join('\n- ')}`);
+                    } else {
+                        this.addAIMessage('ai', `❌ Pull failed: ${result.error}`);
+                    }
+                }
+            } catch (e) {
+                this.hideAITypingIndicator();
+                this.addAIMessage('ai', `❌ Error: ${e.message}`);
+            }
+            return;
         }
 
         this.addAIMessage('user', message);

@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
@@ -45,6 +46,123 @@ tree_sitter_service = TreeSitterService()
 
 from agents.workflow import MultiFileEditWorkflow
 multi_file_workflow = MultiFileEditWorkflow(llm_service, rag_service, tree_sitter_service)
+
+from services.git_service import GitService
+git_service = GitService()
+
+@app.route("/api/git/clone", methods=["POST"])
+def clone_repo():
+    try:
+        data = request.get_json()
+        repo_url = data.get("repo_url")
+        target_path = data.get("target_path")
+        token = data.get("token")
+
+        if not repo_url or not target_path:
+            return jsonify({"error": "Missing repo_url or target_path"}), 400
+        
+        result = git_service.clone_repository(repo_url, target_path, token)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/git/status", methods=["GET"])
+def git_status():
+    try:
+        path = request.args.get("path")
+        if not path:
+             return jsonify({"error": "Missing path parameter"}), 400
+        
+        result = git_service.get_status(path)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/git/commit", methods=["POST"])
+def git_commit():
+    try:
+        data = request.get_json()
+        path = data.get("path")
+        message = data.get("message")
+        
+        if not path or not message:
+            return jsonify({"error": "Missing path or message"}), 400
+
+        result = git_service.commit_changes(path, message)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/git/push", methods=["POST"])
+def git_push():
+    try:
+        data = request.get_json()
+        path = data.get("path")
+        token = data.get("token")
+        branch = data.get("branch")
+
+        if not path:
+             return jsonify({"error": "Missing path"}), 400
+
+        result = git_service.push_changes(path, branch, token)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/extensions", methods=["GET"])
+def get_extensions():
+    try:
+        query = request.args.get("q", "")
+        # VS Code Marketplace API payload
+        payload = {
+            "filters": [
+                {
+                    "criteria": [
+                        {"filterType": 10, "value": query},
+                        {"filterType": 8, "value": "Microsoft.VisualStudio.Code"},
+                        {"filterType": 12, "value": "4096"}
+                    ],
+                    "pageNumber": 1,
+                    "pageSize": 20,
+                    "sortBy": 0,
+                    "sortOrder": 0
+                }
+            ],
+            "assetTypes": ["Microsoft.VisualStudio.Services.Icons.Default", "Microsoft.VisualStudio.Services.Icons.Small"],
+            "flags": 914
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json;api-version=3.0-preview.1"
+        }
+        
+        response = requests.post(
+            "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery",
+            json=payload,
+            headers=headers
+        )
+        
+        return jsonify(response.json())
+    except Exception as e:
+        logger.error(f"Error fetching extensions: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/git/pull", methods=["POST"])
+def git_pull():
+    try:
+        data = request.get_json()
+        path = data.get("path")
+        branch = data.get("branch")
+
+        if not path:
+             return jsonify({"error": "Missing path"}), 400
+
+        result = git_service.pull_changes(path, branch)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Not found", "message": str(error)}), 404
@@ -65,6 +183,18 @@ def internal_error(error):
 
 
 #Middleware
+@app.route("/api/git/history", methods=["GET"])
+def git_history():
+    try:
+        path = request.args.get("path")
+        if not path:
+             return jsonify({"error": "Missing path parameter"}), 400
+        
+        result = git_service.get_history(path)
+        return jsonify(result)
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
 @app.before_request
 def log_request_info():
     logger.info(f"Request: {request.method} {request.path}")
@@ -489,6 +619,25 @@ def agent_edit():
         logger.error(f"Error in agent_edit: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route("/api/visualize", methods=["POST"])
+def visualize_algorithm():
+    try:
+        data = request.get_json()
+        code = data.get("code")
+        language = data.get("language", "auto")
+        
+        if not code:
+            return jsonify({"error": "Missing code field"}), 400
+            
+        logger.info(f"Generating visualization for {language} code")
+        
+        result = llm_service.generate_visualization(code, language)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error in visualize_algorithm: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))

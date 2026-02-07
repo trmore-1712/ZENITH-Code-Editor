@@ -407,6 +407,65 @@ Examples:
             logger.error(f"Error documenting code: {str(e)}")
             return {"success": False, "documented_code": code, "documentation": f"Error: {str(e)}", "summary": ""}
 
+    def generate_visualization(self, code: str, language: str = "auto") -> Dict[str, Any]:
+        """Generate a self-contained HTML/JS visualization for the given algorithm"""
+        try:
+            self._ensure_configured()
+            if language == "auto":
+                language = self._detect_language(code)
+            
+            system_prompt = """You are an expert Algorithm Visualizer. 
+            Your task is to generate a single, self-contained HTML file (with embedded CSS and JS) that visualizes the execution of the provided algorithm.
+            
+            Requirements:
+            1. The output MUST be a valid, runnable HTML file.
+            2. Use modern CSS for a premium, dark-mode VS Code aesthetic (GitHub Dark theme colors).
+            3. Implement the algorithm in JavaScript and visualize its steps (e.g., sorting bars, traversing graphs, moving pointers).
+            4. **Controls**: You MUST include a fixed control panel at the bottom with:
+               - [Custom Input] field (for user to change data, e.g., array values)
+               - [Set Data] button to apply input
+               - [ < Step Back ] button
+               - [ Play/Pause ] button
+               - [ Step Forward > ] button
+               - [ Reset ] button
+               - [Speed] slider
+            5. The visualization should be dynamic and interactive.
+            6. Do NOT require external libraries unless imported via CDN (prefer vanilla JS or D3.js via CDN).
+            7. **Step Explanation**: Display the current step's explanation in a clear text panel.
+            8. If the code is not an algorithm (e.g., just a function), try to visualize its flow or data transformation.
+            
+            Structure:
+            - Header: Title and Status
+            - Main: Visualization Canvas (centered, large)
+            - Footer: Controls and Inputs
+            """
+            
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Create a visualization for this {language} algorithm:\n```{language}\n{code}\n```"),
+            ]
+            
+            response = self.llm.invoke(messages)
+            content = response.content
+            
+            # Extract HTML block
+            import re
+            html_matches = re.findall(r"```html\n(.*?)\n```", content, re.DOTALL)
+            visualization_html = html_matches[0].strip() if html_matches else content
+            
+            return {
+                "success": True,
+                "visualization": visualization_html,
+                "model": self.model
+            }
+        except Exception as e:
+            logger.error(f"Error generating visualization: {str(e)}")
+            return {
+                "success": False, 
+                "error": str(e), 
+                "visualization": f"<h1>Error generating visualization</h1><p>{str(e)}</p>"
+            }
+
     def _detect_language(self, code: str) -> str:
         code_lower = code.lower()
         language_patterns = {

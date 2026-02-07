@@ -715,6 +715,94 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     sendEditorContent: (content) => {
         ipcRenderer.send('editor-content', content);
+    },
+
+    gitClone: async (repoUrl, targetPath, token) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/clone`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repo_url: repoUrl, target_path: targetPath, token })
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git clone error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    gitStatus: async (path) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/status?path=${encodeURIComponent(path)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git status error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    gitCommit: async (path, message) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/commit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, message })
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git commit error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    gitPush: async (path, branch, token) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, branch, token })
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git push error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    gitPull: async (path, branch) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/pull`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path, branch })
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git pull error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    gitHistory: async (path) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/git/history?path=${encodeURIComponent(path)}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error('Git history error:', error);
+            return { success: false, error: error.message };
+        }
     }
 });
 

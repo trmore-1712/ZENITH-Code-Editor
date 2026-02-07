@@ -607,12 +607,12 @@ ipcMain.handle('agent-edit', async (event, data) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return { success: false, error: `Backend error: ${response.status} - ${errorText}` };
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error in agent-edit:', error);
