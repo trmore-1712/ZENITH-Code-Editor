@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algorithm Visualizer Engine</title>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #cccccc;
+            --accent-color: #007acc;
+            --secondary-color: #4ec9b0;
+            --error-color: #f48771;
+            --panel-bg: rgba(30, 30, 30, 0.75);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Canvas Area */
+        #viz-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #252526 0%, #1e1e1e 100%);
+        }
+
+        /* Top Overlay: Info & Status */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            max-width: 400px;
+            transition: all 0.3s ease;
+        }
+
+        .info-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--secondary-color);
+        }
+
+        .step-desc {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #eee;
+        }
+
+        /* Data Input Panel (Hidden by default, toggled via button) */
+        .data-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            display: none; /* Toggled */
+            width: 300px;
+            z-index: 100;
+        }
+
+        .data-panel.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .data-panel textarea {
+            width: 100%;
+            height: 100px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+
+        .data-panel button {
+            width: 100%;
+            padding: 8px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .data-panel button:hover { background: #0062a3; }
+
+        /* Bottom Controls */
+        .controls {
+            height: 80px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 20px;
+        }
+
+        .btn-control {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-control:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--accent-color);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .btn-control.primary {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+            width: 50px;
+            height: 50px;
+        }
+        .btn-control.primary:hover {
+            background: #0098ff;
+            box-shadow: 0 0 15px rgba(0, 122, 204, 0.5);
+        }
+
+        /* Slider */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100px; 
+            background: transparent; 
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            margin-top: -5px; 
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        /* --- VISUALIZATION ELEMENTS (D3/DOM) --- */
+        
+        /* Array Bars */
+        .bar {
+            fill: var(--accent-color);
+            transition: fill 0.2s;
+        }
+        .bar.comparing { fill: #f1c40f; } /* Yellow */
+        .bar.sorted { fill: var(--secondary-color); } /* Green */
+        .bar.swapping { fill: #e74c3c; } /* Red */
+
+        .bar-label {
+            fill: #fff;
+            font-size: 12px;
+            text-anchor: middle;
+        }
+
+        /* Graph Nodes */
+        .node circle {
+            fill: #2d2d2d;
+            stroke: var(--accent-color);
+            stroke-width: 2px;
+            transition: all 0.3s;
+        }
+        .node text {
+            fill: #fff;
+            font-size: 12px;
+            text-anchor: middle;
+            dy: 0.35em;
+            pointer-events: none;
+        }
+        
+        .node.visited circle { fill: #2c3e50; stroke: var(--secondary-color); }
+        .node.current circle { fill: #e67e22; stroke: #e67e22; stroke-width: 3px; }
+        .node.path circle { fill: var(--secondary-color); stroke: #fff; }
+
+        .link {
+            stroke: #555;
+            stroke-width: 2px;
+            transition: stroke 0.3s;
+        }
+        .link.traversed { stroke: var(--secondary-color); }
+        
+        /* Grid Cells */
+        .grid-cell {
+            stroke: #333;
+            fill: #1e1e1e;
+        }
+        .grid-cell.wall { fill: #555; }
+        .grid-cell.start { fill: var(--secondary-color); }
+        .grid-cell.end { fill: var(--error-color); }
+        .grid-cell.visited { fill: rgba(0, 122, 204, 0.4); }
+        .grid-cell.path { fill: var(--accent-color); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Progress Bar */
+        .progress-container {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.05);
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+    </style>
+    
+    <!-- Dependencies -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+    <div id="viz-container"></div>
+
+    <div class="info-panel">
+        <h2 id="viz-title">Algorithm Visualization</h2>
+        <div class="step-desc" id="step-desc">Ready to start...</div>
+    </div>
+
+    <!-- Toggle Data Panel Button -->
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 101;">
+        <button class="btn-control" id="btn-data" title="Edit Data">
+            <i class="fas fa-database"></i>
+        </button>
+    </div>
+
+    <div class="data-panel" id="data-panel">
+        <h3>Custom Input</h3>
+        <textarea id="data-input" placeholder="Enter array (e.g., [5, 2, 9, 1]) or graph data..."></textarea>
+        <button id="btn-update-data">Update Data</button>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-control" id="btn-reset" title="Reset">
+            <i class="fas fa-undo"></i>
+        </button>
+        <button class="btn-control" id="btn-prev" title="Step Back">
+            <i class="fas fa-step-backward"></i>
+        </button>
+        <button class="btn-control primary" id="btn-play" title="Play/Pause">
+            <i class="fas fa-play" id="icon-play"></i>
+        </button>
+        <button class="btn-control" id="btn-next" title="Step Forward">
+            <i class="fas fa-step-forward"></i>
+        </button>
+        
+        <div class="slider-container">
+            <i class="fas fa-tachometer-alt"></i>
+            <input type="range" id="speed-slider" min="1" max="10" value="5">
+        </div>
+    </div>
+
+    <script>
+        // --- VISUALIZER ENGINE CORE ---
+        
+        class VisualizerEngine {
+            constructor() {
+                this.container = document.getElementById('viz-container');
+                this.width = this.container.clientWidth;
+                this.height = this.container.clientHeight;
+                
+                this.steps = [];
+                this.currentStep = 0;
+                this.isPlaying = false;
+                this.speed = 500; // ms per step
+                this.timer = null;
+                this.mode = 'array'; // array, graph, grid
+                
+                this.svg = d3.select("#viz-container")
+                    .append("svg")
+                    .attr("width", "100%")
+                    .attr("height", "100%")
+                    .attr("viewBox", `0 0 ${this.width} ${this.height}`);
+
+                this.elements = {}; // References to SVG elements
+                this.data = [];
+            }
+
+            // --- API Methods for LLM to call ---
+
+            setMode(mode) {
+                this.mode = mode;
+                this.svg.selectAll("*").remove(); // Clear canvas
+                console.log(`Mode set to: ${mode}`);
+            }
+            
+            // Initial Data Setup
+            setData(data) {
+                this.data = JSON.parse(JSON.stringify(data)); // Deep copy
+                this.reset();
+                this.drawInitialState();
+                
+                // Populate input box for editing
+                document.getElementById('data-input').value = JSON.stringify(data);
+            }
+            
+            // Add a step record
+            addStep(stepData) {
+                // stepData: { type, indices, value, description, ... }
+                this.steps.push(stepData);
+            }
+
+            // --- Drawing Logic ---
+
+            drawInitialState() {
+                this.svg.selectAll("*").remove();
+                
+                if (this.mode === 'array') {
+                    this.drawArray(this.data);
+                } else if (this.mode === 'graph') {
+                    this.drawGraph(this.data);
+                } else if (this.mode === 'grid') {
+                    this.drawGrid(this.data);
+                }
+            }
+
+            drawArray(arr) {
+                const maxVal = Math.max(...arr);
+                const barWidth = Math.min(60, (this.width - 100) / arr.length);
+                const spacing = 5;
+                const totalWidth = arr.length * (barWidth + spacing);
+                const startX = (this.width - totalWidth) / 2;
+                const scaleY = d3.scaleLinear().domain([0, maxVal]).range([0, this.height * 0.6]);
+
+                this.svg.selectAll(".bar-group")
+                    .data(arr)
+                    .enter()
+                    .append("g")
+                    .attr("class", "bar-group")
+                    .attr("transform", (d, i) => `translate(${startX + i * (barWidth + spacing)}, ${this.height / 2 + 100})`)
+                    .each(function(d, i) {
+                        const h = scaleY(d);
+                        const group = d3.select(this);
+                        
+                        // Bar
+                        group.append("rect")
+                            .attr("class", "bar")
+                            .attr("id", `bar-${i}`)
+                            .attr("width", barWidth)
+                            .attr("height", h)
+                            .attr("y", -h)
+                            .attr("rx", 4);
+                        
+                        // Label
+                        group.append("text")
+                            .attr("class", "bar-label")
+                            .attr("x", barWidth / 2)
+                            .attr("y", 20)
+                            .text(d);
+                    });
+            }
+
+            drawGraph() {
+                 console.log("[Visualizer] drawGraph called with:", this.data);
+                 if (!this.data || !this.data.nodes) {
+                     console.warn("[Visualizer] No nodes to draw in graph mode.");
+                     return;
+                 }
+                 
+                 // Clear previous
+                 this.svg.selectAll("*").remove(); 
+                 
+                 // Check if links exist
+                 const linksData = this.data.links || [];
+                 console.log(`[Visualizer] Nodes: ${this.data.nodes.length}, Links: ${linksData.length}`);
+
+                 // Setup Force Simulation
+                 const simulation = d3.forceSimulation(this.data.nodes)
+                    .force("link", d3.forceLink(linksData).id(d => d.id).distance(100))
+                    .force("charge", d3.forceManyBody().strength(-500))
+                    .force("center", d3.forceCenter(this.width / 2, this.height / 2))
+                    .force("collide", d3.forceCollide(30));
+
+                // Draw Links
+                const link = this.svg.append("g")
+                    .attr("class", "links-layer")
+                    .selectAll("line")
+                    .data(linksData)
+                    .enter().append("line")
+                    .attr("class", "link")
+                    .attr("id", (d, i) => `link-${i}`)
+                    .attr("stroke", "#999")
+                    .attr("stroke-width", 2);
+
+                // Draw Nodes
+                const node = this.svg.append("g")
+                    .attr("class", "nodes-layer")
+                    .selectAll("g")
+                    .data(this.data.nodes)
+                    .enter().append("g")
+                    .attr("class", "node")
+                    .attr("id", d => `node-${d.id}`)
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended));
+
+                node.append("circle")
+                    .attr("r", 20)
+                    .attr("fill", "#69b3a2"); // Default fill
+
+                node.append("text")
+                    .text(d => d.id)
+                    .attr("dy", 5) // Center text vertically roughly
+                    .attr("text-anchor", "middle")
+                    .style("fill", "white")
+                    .style("font-size", "12px")
+                    .style("pointer-events", "none"); // Let clicks pass through text
+
+                simulation.on("tick", () => {
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+
+                    node
+                        .attr("transform", d => `translate(${d.x},${d.y})`);
+                });
+                
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+            }
+            
+            // --- Animation execution ---
+
+            async runFrame(step, direction = 1) {
+                // If direction is -1 (backwards), we need to revert the state
+                // Use DOM manipulation directly for performance
+                
+                const { type, targets, color, description, swap } = step;
+                
+                // Update text
+                document.getElementById('step-desc').textContent = description || `Step ${this.currentStep}`;
+
+                if (this.mode === 'array') {
+                    // Reset all colors first (simplified approach)
+                    d3.selectAll(".bar").classed("comparing sorted swapping", false).style("fill", null);
+
+                    if (type === 'compare') {
+                        targets.forEach(idx => d3.select(`#bar-${idx}`).classed("comparing", true));
+                    } else if (type === 'swap') {
+                        const [i, j] = targets;
+                        // Animate Swap
+                        // Updating DOM data for persistence
+                        const bar1 = d3.select(`#bar-${i}`);
+                        const bar2 = d3.select(`#bar-${j}`);
+                        
+                        bar1.classed("swapping", true);
+                        bar2.classed("swapping", true);
+                        
+                        if (direction === 1) {
+                            // Swap heights and text
+                            const h1 = bar1.attr("height");
+                            const y1 = bar1.attr("y");
+                            const t1 = d3.select(bar1.node().parentNode).select("text").text();
+                            
+                            const h2 = bar2.attr("height");
+                            const y2 = bar2.attr("y");
+                            const t2 = d3.select(bar2.node().parentNode).select("text").text();
+                            
+                            bar1.transition().duration(this.speed/2).attr("height", h2).attr("y", y2);
+                            d3.select(bar1.node().parentNode).select("text").text(t2);
+                            
+                            bar2.transition().duration(this.speed/2).attr("height", h1).attr("y", y1);
+                            d3.select(bar2.node().parentNode).select("text").text(t1);
+                        }
+                        
+                    } else if (type === 'sorted') {
+                        targets.forEach(idx => d3.select(`#bar-${idx}`).classed("sorted", true));
+                    }
+                }
+                
+                // Graph handling...
+            }
+
+            // --- Controls ---
+
+            play() {
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                document.getElementById('icon-play').className = 'fas fa-pause';
+                this.loop();
+            }
+
+            pause() {
+                this.isPlaying = false;
+                document.getElementById('icon-play').className = 'fas fa-play';
+                clearTimeout(this.timer);
+            }
+            
+            toggle() {
+                this.isPlaying ? this.pause() : this.play();
+            }
+
+            loop() {
+                if (!this.isPlaying) return;
+                
+                if (this.currentStep < this.steps.length) {
+                    this.runFrame(this.steps[this.currentStep]);
+                    this.currentStep++;
+                    this.updateProgress();
+                    
+                    this.timer = setTimeout(() => this.loop(), this.speed);
+                } else {
+                    this.pause();
+                }
+            }
+
+            stepForward() {
+                if (this.currentStep < this.steps.length) {
+                    this.runFrame(this.steps[this.currentStep]);
+                    this.currentStep++;
+                    this.updateProgress();
+                }
+            }
+
+            stepBack() {
+                if (this.currentStep > 0) {
+                    this.currentStep--;
+                    // Re-run the frame in reverse or just re-render up to previous step
+                    // For simplicity in this engine: re-draw initial and fast-forward
+                    // Optimized: just undo if type supports it, otherwise re-render
+                    this.resetToStep(this.currentStep);
+                }
+            }
+
+            reset() {
+                this.pause();
+                this.currentStep = 0;
+                this.drawInitialState();
+                this.updateProgress();
+                document.getElementById('step-desc').textContent = "Ready to start...";
+            }
+            
+            resetToStep(stepIndex) {
+                // Naive implementation: Reset and fast forward
+                // Ideally we would record "Undo" operations
+                this.drawInitialState();
+                for (let i = 0; i < stepIndex; i++) {
+                   // Run without animation duration
+                   const tempSpeed = this.speed;
+                   this.speed = 0;
+                   this.runFrame(this.steps[i]);
+                   this.speed = tempSpeed;
+                }
+                this.updateProgress();
+            }
+
+            updateProgress() {
+                const pct = (this.currentStep / this.steps.length) * 100;
+                document.getElementById('progress-bar').style.width = `${pct}%`;
+            }
+            
+            setSpeed(val) {
+                // slider 1-10. 1 = 1000ms, 10 = 100ms
+                this.speed = 1000 - (val * 90);
+            }
+        }
+
+        // --- GLOBAL INSTANCE ---
+        const engine = new VisualizerEngine();
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('btn-play').addEventListener('click', () => engine.toggle());
+        document.getElementById('btn-reset').addEventListener('click', () => engine.reset());
+        document.getElementById('btn-next').addEventListener('click', () => { engine.pause(); engine.stepForward(); });
+        document.getElementById('btn-prev').addEventListener('click', () => { engine.pause(); engine.stepBack(); });
+        document.getElementById('speed-slider').addEventListener('input', (e) => engine.setSpeed(e.target.value));
+        
+        document.getElementById('btn-data').addEventListener('click', () => {
+            document.getElementById('data-panel').classList.toggle('visible');
+        });
+
+        // Add runScript method to Engine
+        VisualizerEngine.prototype.runScript = function() {
+            if (!this.script) return;
+            try {
+                console.log("[Visualizer] Running script...");
+                const generateSteps = new Function('engine', 'data', this.script);
+                
+                this.steps = []; 
+                const dataCopy = JSON.parse(JSON.stringify(this.data));
+                generateSteps(this, dataCopy);
+                
+                console.log(`[Visualizer] Generated ${this.steps.length} steps.`);
+                
+                if (this.steps.length === 0) console.warn("Visualizer Warning: No steps generated.");
+                
+                this.reset();
+                if (this.steps.length > 0) setTimeout(() => this.play(), 500);
+            } catch (e) {
+                console.error("[Visualizer] Script Error:", e);
+            }
+        };
+        
+        document.getElementById('btn-update-data').addEventListener('click', () => {
+            const raw = document.getElementById('data-input').value.trim();
+            if (!raw) return;
+
+            let data;
+            try {
+                // 1. Try JSON first (Universal)
+                if (raw.startsWith('[') || raw.startsWith('{')) {
+                    data = JSON.parse(raw);
+                } 
+                // 2. CSV for Arrays (e.g. "1, 2, 3")
+                else if (engine.mode === 'array') {
+                    data = raw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+                    if (data.length === 0) throw new Error("No valid numbers found");
+                } 
+                // 3. Edge List for Graphs (Generic format: "A-B", "A->B", "A B")
+                else if (engine.mode === 'graph') {
+                    const lines = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+                    const nodes = new Set();
+                    const links = [];
+                    
+                    lines.forEach(line => {
+                        const parts = line.split(/[-,>\s]+/).filter(s => s);
+                        if (parts.length >= 2) {
+                            const [src, tgt] = parts;
+                            nodes.add(src);
+                            nodes.add(tgt);
+                            links.push({ source: src, target: tgt });
+                        } else if (parts.length === 1) {
+                            nodes.add(parts[0]);
+                        }
+                    });
+
+                    if (nodes.size === 0) throw new Error("No nodes found");
+
+                    // Auto-Layout: Circle (Force layout will take over)
+                    const nodeList = Array.from(nodes).map((id, i, arr) => {
+                        const angle = (i / arr.length) * 2 * Math.PI;
+                        const R = 150;
+                        return {
+                            id,
+                            x: 400 + R * Math.cos(angle),
+                            y: 300 + R * Math.sin(angle)
+                        };
+                    });
+
+                    data = { nodes: nodeList, links };
+                } else {
+                    throw new Error("Please use JSON");
+                }
+
+                engine.setData(data); // Update visual
+                engine.runScript();   // Re-run logic
+                document.getElementById('data-panel').classList.remove('visible');
+            } catch (e) {
+                alert(`Data Error: ${e.message}\nTry "1, 2, 3" (Array) or "A-B" (Graph)`);
+            }
+        });
+
+    </script>
+</body>
+</html>

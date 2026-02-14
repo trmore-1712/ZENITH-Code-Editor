@@ -215,6 +215,41 @@ class CodeEditor {
             runBtn.addEventListener('click', () => this.runCurrentFile());
         }
 
+        // Terminal Actions
+        document.getElementById('new-terminal-btn')?.addEventListener('click', () => {
+             // For now, just clear and focus, effectively "new" session visual
+             this.term.reset();
+             this.term.write('\r\n\x1b[32m$ New Session Started\x1b[0m\r\n');
+             window.electronAPI.terminalWrite('\r'); // Enter to get prompt
+        });
+
+        document.getElementById('clear-terminal-btn')?.addEventListener('click', () => {
+            this.term.clear();
+        });
+
+        document.getElementById('close-terminal-btn')?.addEventListener('click', () => {
+            const terminalPanel = document.getElementById('terminal-panel');
+            if (terminalPanel) {
+                terminalPanel.style.height = '0px';
+                terminalPanel.style.display = 'none'; // Ensure it's hidden
+                terminalPanel.classList.remove('visible');
+            }
+        });
+
+        // Visualizer Close Button
+        document.getElementById('close-viz-btn')?.addEventListener('click', () => {
+            document.getElementById('visualization-panel').style.display = 'none';
+            document.getElementById('monaco-wrapper').style.display = 'flex';
+        });
+
+        // Scratchpad Clear Button
+        document.getElementById('clear-scratchpad-btn')?.addEventListener('click', () => {
+             const scratchpad = document.querySelector('.scratchpad-area');
+             if (scratchpad && confirm('Clear scratchpad?')) {
+                 scratchpad.value = '';
+             }
+        });
+
         // Expose term for other methods
         this.fitAddon = fitAddon;
     }
@@ -1041,62 +1076,97 @@ class CodeEditor {
     }
 
     async visualizeAlgorithm() {
-        const scratchpad = document.querySelector('.scratchpad-area');
-        if (!scratchpad) return;
+        console.log("visualizeAlgorithm called - PROMPT RESTORED v2");
+        
+        let code = '';
+        if (window.scratchpadEditor) {
+            code = window.scratchpadEditor.getValue();
+        } else {
+            const area = document.querySelector('.scratchpad-area');
+            if (area) code = area.value;
+        }
 
-        const code = scratchpad.value.trim();
-        if (!code) {
-            this.showNotification('Please enter some algorithm code first', 'warning');
+        if (!code || !code.trim()) {
+            this.showNotification("Please enter some code in the Scratchpad to visualize!", 'warning');
             return;
         }
 
-        this.showNotification('Generating visualization... This may take a moment.', 'info');
-
-        // Show panel with loading
-        const panel = document.getElementById('visualization-panel');
-        const wrapper = document.getElementById('monaco-wrapper');
-        const iframe = document.getElementById('viz-frame');
-
-        wrapper.style.display = 'none';
-        panel.style.display = 'flex';
-
-        // Set loading state in iframe
-        const loadingHtml = `
-            <style>
-                body { background: #1e1e1e; color: #ccc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .loader { border: 4px solid #333; border-top: 4px solid #007acc; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            </style>
-            <div style="text-align: center;">
-                <div class="loader" style="margin: 0 auto 20px;"></div>
-                <div>Generating AI Visualization...</div>
-            </div>
-        `;
-        iframe.srcdoc = loadingHtml;
-
-        try {
-            const response = await fetch('http://127.0.0.1:5000/api/visualize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code, language: 'javascript' }) // Assume JS for scratchpad or detect
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Inject the visualization HTML
-                // We use srcdoc to safely isolate it (somewhat) and ensure it renders as a document
-                iframe.srcdoc = data.visualization;
-                this.showNotification('Visualization generated!', 'success');
-            } else {
-                iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Error: ${data.error}</div>`;
-                this.showNotification('Failed to generate visualization', 'error');
-            }
-        } catch (error) {
-            console.error('Visualization error:', error);
-            iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Connection Error: ${error.message}</div>`;
-            this.showNotification('Error connecting to backend', 'error');
+        const vizPanel = document.getElementById('visualization-panel');
+        const monacoWrapper = document.getElementById('monaco-wrapper');
+        
+        // Switch view
+        if (monacoWrapper) monacoWrapper.style.display = 'none';
+        if (vizPanel) {
+            vizPanel.style.display = 'block';
+            vizPanel.classList.add('visible');
         }
+
+        const iframe = document.getElementById('viz-frame');
+        if (!iframe) {
+             console.error("Viz frame not found");
+             return;
+        }
+        
+        // Force reload to ensure clean state
+        const enginePath = 'renderer/visualizer.html';
+        iframe.src = enginePath;
+
+        iframe.onload = async () => {
+            try {
+                this.showNotification('Generating visualization...', 'info');
+                const response = await fetch('http://127.0.0.1:5000/api/visualize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code, language: 'javascript' }) 
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.visualization_data) {
+                    const vizData = data.visualization_data;
+                    
+                    // Smart Defaults
+                    let mode = vizData.mode || 'array';
+                    let initialData = vizData.data;
+
+                    if (!initialData) {
+                        if (code.toLowerCase().includes('graph') || code.toLowerCase().includes('bfs') || code.toLowerCase().includes('dfs')) {
+                            mode = 'graph';
+                            initialData = {
+                                nodes: [
+                                    {id: 'A', x: 250, y: 100}, {id: 'B', x: 150, y: 200},
+                                    {id: 'C', x: 350, y: 200}, {id: 'D', x: 150, y: 300},
+                                    {id: 'E', x: 350, y: 300}
+                                ],
+                                links: [
+                                    {source: 'A', target: 'B'}, {source: 'A', target: 'C'},
+                                    {source: 'B', target: 'D'}, {source: 'C', target: 'E'},
+                                    {source: 'B', target: 'C'}
+                                ]
+                            };
+                        } else {
+                            mode = 'array';
+                            initialData = [15, 8, 20, 5, 12, 3, 9, 17];
+                        }
+                    }
+
+                    iframe.contentWindow.postMessage({
+                        type: 'init',
+                        title: vizData.title || "Scratchpad Visualization",
+                        mode: mode,
+                        data: initialData,
+                        script: vizData.script
+                    }, '*');
+
+                    this.showNotification('Visualization loaded!', 'success');
+                } else {
+                    this.showNotification(`Failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Visualization error:', error);
+                this.showNotification('Error connecting to backend', 'error');
+            }
+        };
     }
 
     setupElectronHandlers() {

@@ -408,62 +408,89 @@ Examples:
             return {"success": False, "documented_code": code, "documentation": f"Error: {str(e)}", "summary": ""}
 
     def generate_visualization(self, code: str, language: str = "auto") -> Dict[str, Any]:
-        """Generate a self-contained HTML/JS visualization for the given algorithm"""
+        """Generate a visualization script for the standard Visualizer Engine"""
         try:
             self._ensure_configured()
             if language == "auto":
                 language = self._detect_language(code)
             
-            system_prompt = """You are an expert Algorithm Visualizer. 
-            Your task is to generate a single, self-contained HTML file (with embedded CSS and JS) that visualizes the execution of the provided algorithm.
+            system_prompt = """You are an expert Algorithm Visualizer Logic Generator.
+            Your task is to analyze the provided code and generate a JSON configuration for our standard Visualizer Engine.
+
+            The Engine supports these modes: 'array' (for sorting/searching), 'graph' (nodes/links), 'grid' (pathfinding).
+
+            Output JSON format:
+            {
+                "title": "Algorithm Name",
+                "mode": "array" | "graph" | "grid",
+                "data": [initial_data_structure],
+                "script": "JavaScript code string"
+            }
+
+            CRITICAL VISUALIZATION RULES:
+            1. The 'script' must be a single STRING of valid JavaScript.
+            2. It DOES NOT include `function main() { ... }`. It is the *body* of a function.
+            3. You have access to `engine` and `data` objects.
+            4. You MUST call `engine.addStep({...})` to record every significant action (compare, swap, visit).
+            5. Do NOT use `await`, `setTimeout`, or `console.log`. The logic must run SYNCHRONOUSLY.
+            6. **Initialize ALL variables** (stacks, queues, sets) at the start of your script.
             
-            Requirements:
-            1. The output MUST be a valid, runnable HTML file.
-            2. Use modern CSS for a premium, dark-mode VS Code aesthetic (GitHub Dark theme colors).
-            3. Implement the algorithm in JavaScript and visualize its steps (e.g., sorting bars, traversing graphs, moving pointers).
-            4. **Controls**: You MUST include a fixed control panel at the bottom with:
-               - [Custom Input] field (for user to change data, e.g., array values)
-               - [Set Data] button to apply input
-               - [ < Step Back ] button
-               - [ Play/Pause ] button
-               - [ Step Forward > ] button
-               - [ Reset ] button
-               - [Speed] slider
-            5. The visualization should be dynamic and interactive.
-            6. Do NOT require external libraries unless imported via CDN (prefer vanilla JS or D3.js via CDN).
-            7. **Step Explanation**: Display the current step's explanation in a clear text panel.
-            8. If the code is not an algorithm (e.g., just a function), try to visualize its flow or data transformation.
+            Data Structures by Mode:
+            - "array": `data` is `[1, 5, 2, ...]`
+            - "graph": `data` is `{ nodes: [{id: 'A', x: 100, y: 100}, ...], links: [{source: 'A', target: 'B'}, ...] }`.
+              *NOTE*: For graph algorithms, you usually need to build an Adjacency List from `data.links` first!
             
-            Structure:
-            - Header: Title and Status
-            - Main: Visualization Canvas (centered, large)
-            - Footer: Controls and Inputs
+            Visualizer API (`engine.addStep(stepObj)`):
+            - Compare: `{ type: 'compare', targets: [i, j], description: 'Comparing...' }`
+            - Swap:    `{ type: 'swap', targets: [i, j], description: 'Swapping...' }` 
+            - Sorted:  `{ type: 'sorted', targets: [i], description: 'Sorted' }`
+            - Highlight: `{ type: 'highlight', targets: ['nodeId'], description: 'Visiting Node...' }` (For Graphs)
+            
+            Example Script (Bubble Sort):
+            "let arr = data; let n = arr.length; for (let i = 0; i < n - 1; i++) { ... }"
+
+            Example Script (DFS Graph):
+            "let adj = {}; data.nodes.forEach(n => adj[n.id] = []); data.links.forEach(l => { adj[l.source.id].push(l.target.id); adj[l.target.id].push(l.source.id); }); let visited = new Set(); let stack = [data.nodes[0].id]; while (stack.length > 0) { let u = stack.pop(); if (!visited.has(u)) { visited.add(u); engine.addStep({ type: 'highlight', targets: [u], description: 'Visiting ' + u }); let neighbors = adj[u] || []; for (let v of neighbors) { if (!visited.has(v)) { stack.push(v); } } } }"
             """
             
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=f"Create a visualization for this {language} algorithm:\n```{language}\n{code}\n```"),
+                HumanMessage(content=f"Generate visualization logic for this {language} algorithm:\n{code}"),
             ]
             
             response = self.llm.invoke(messages)
-            content = response.content
+            content = response.content.strip()
             
-            # Extract HTML block
-            import re
-            html_matches = re.findall(r"```html\n(.*?)\n```", content, re.DOTALL)
-            visualization_html = html_matches[0].strip() if html_matches else content
+            # Clean up if LLM added markdown
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
             
-            return {
-                "success": True,
-                "visualization": visualization_html,
-                "model": self.model
-            }
+            content = content.strip()
+            
+            # Validate JSON
+            try:
+                viz_data = json.loads(content)
+                return {
+                    "success": True,
+                    "visualization_data": viz_data
+                }
+            except json.JSONDecodeError as je:
+                 logger.error(f"JSON Parse Error: {je}")
+                 return {
+                     "success": False,
+                     "error": "Failed to parse AI response. Try again.",
+                     "raw_response": content
+                 }
+
         except Exception as e:
             logger.error(f"Error generating visualization: {str(e)}")
             return {
                 "success": False, 
-                "error": str(e), 
-                "visualization": f"<h1>Error generating visualization</h1><p>{str(e)}</p>"
+                "error": str(e)
             }
 
     def _detect_language(self, code: str) -> str:
