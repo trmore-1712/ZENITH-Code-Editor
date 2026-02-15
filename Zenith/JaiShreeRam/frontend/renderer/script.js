@@ -1,6 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
-    window.codeEditor = new CodeEditor();
-});
+// CodeEditor initialized at the end of file
+// document.addEventListener('DOMContentLoaded', () => {
+//     window.codeEditor = new CodeEditor();
+// });
 
 class CodeEditor {
     constructor() {
@@ -1626,8 +1627,12 @@ class CodeEditor {
         // This prevents overwriting updated content when refreshing the same tab (e.g. after Apply Edit)
         if (this.activeTab && this.activeTab !== filePath && this.tabs.has(this.activeTab) && this.editor) {
             const currentTabInfo = this.tabs.get(this.activeTab);
-            currentTabInfo.content = this.editor.getValue();
-            console.log(`Saved content for tab: ${this.activeTab}`);
+            // CRITICAL FIX: Do NOT save content if the tab was in Diff Mode, 
+            // as the editor might be empty or not reflecting the actual file content.
+            if (!currentTabInfo.isDiff) {
+                currentTabInfo.content = this.editor.getValue();
+                console.log(`Saved content for tab: ${this.activeTab}`);
+            }
         }
 
         // Remove active class from all tabs
@@ -1772,12 +1777,18 @@ class CodeEditor {
         const acceptBtn = document.createElement('button');
         acceptBtn.className = 'diff-overlay-btn btn-accept-change';
         acceptBtn.innerHTML = '<i class="fas fa-check"></i> Accept';
-        acceptBtn.onclick = () => this.applySingleEdit(edit);
+        acceptBtn.onclick = () => {
+            const index = this.pendingEdits.indexOf(edit);
+            if (index !== -1) this.acceptSingleEdit(index);
+        };
 
         const rejectBtn = document.createElement('button');
         rejectBtn.className = 'diff-overlay-btn btn-reject-change';
         rejectBtn.innerHTML = '<i class="fas fa-times"></i> Reject';
-        rejectBtn.onclick = () => this.rejectSingleEdit(edit);
+        rejectBtn.onclick = () => {
+            const index = this.pendingEdits.indexOf(edit);
+            if (index !== -1) this.rejectSingleEdit(index);
+        };
 
         toolbar.appendChild(acceptBtn);
         toolbar.appendChild(rejectBtn);
@@ -1880,9 +1891,31 @@ class CodeEditor {
                 tabInfo.isDiff = false;
                 tabInfo.editData = null;
                 tabInfo.content = edit.original_content;
+                
+                // Update UI
+                tabInfo.element.classList.remove('review-mode');
+                
+                // Force refresh if active
+                if (this.activeTab === filePath) {
+                    if (this.editor) this.editor.setValue(edit.original_content);
+                    const diffContainer = document.getElementById('diff-editor-container-tab');
+                    if (diffContainer) diffContainer.style.display = 'none';
+                }
+                
                 this.setActiveTab(filePath);
             }
             this.showNotification('Edit rejected', 'info');
+
+            // Remove from pending edits
+            if (this.pendingEdits) {
+                this.pendingEdits = this.pendingEdits.filter(e => e.file_path !== edit.file_path);
+                
+                // If no more pending edits, close panel
+                if (this.pendingEdits.length === 0) {
+                    const panel = document.querySelector('.review-panel');
+                    if (panel) panel.remove();
+                }
+            }
         }
     }
 
@@ -2108,7 +2141,7 @@ class CodeEditor {
                 tab.element.classList.remove('unsaved');
             }
 
-            this.showNotification('File saved successfully', 'success');
+            // this.showNotification('File saved successfully', 'success');
         } catch (error) {
             this.showNotification(`Failed to save: ${error.message}`, 'error');
         }
@@ -2221,7 +2254,7 @@ class CodeEditor {
         // Start watching folder
         this.watchWorkspaceFolder(folderPath);
 
-        this.showNotification(`Workspace opened: ${folderPath}`, 'success');
+        // this.showNotification(`Workspace opened: ${folderPath}`, 'success');
     }
 
     async openFolderFromPath(folderPath) {
@@ -2284,7 +2317,24 @@ class CodeEditor {
         }
     }
 
+    async indexCodebase() {
+        if (!this.workspacePath) {
+            this.showNotification('No workspace open to index.', 'warning');
+            return;
+        }
 
+        this.showNotification('Indexing codebase for RAG...', 'info');
+        try {
+            const result = await window.electronAPI.indexCodebase(this.workspacePath);
+            if (result.success) {
+                // this.showNotification(result.message || 'Codebase indexed successfully', 'success');
+            } else {
+                this.showNotification(`Indexing failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification(`Error during indexing: ${error.message}`, 'error');
+        }
+    }
 
     toggleAIPanel() {
         const aiPanel = document.getElementById('ai-panel');
@@ -2497,7 +2547,7 @@ class CodeEditor {
                         window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
 
-                        this.showNotification('Documentation downloaded successfully', 'success');
+                        // this.showNotification('Documentation downloaded successfully', 'success');
                         this.addAIMessage('ai', `PDF Documentation generated and downloaded.`);
                     } else {
                         this.showNotification(`Error: ${result.error}`, 'error');
@@ -2654,48 +2704,7 @@ class CodeEditor {
     // 1. Modifying `setActiveTab` to check for `isDiff` flag.
     // 2. If diff, render DiffEditor.
 
-    async applyAllEdits(edits) {
-        this.showNotification('Applying all changes...', 'info');
-        try {
-            for (const edit of edits) {
-                // Save to disk
-                const isNew = edit.is_new;
 
-                if (isNew) {
-                    await window.electronAPI.createFile({
-                        folderPath: this.workspacePath,
-                        fileName: this.getFileNameFromPath(edit.file_path)
-                    });
-                }
-
-                await window.electronAPI.saveFile({
-                    filePath: edit.file_path,
-                    content: edit.new_content
-                });
-
-                // Reset Tab State
-                if (this.tabs.has(edit.file_path)) {
-                    const tabInfo = this.tabs.get(edit.file_path);
-                    tabInfo.isDiff = false;
-                    tabInfo.editData = null;
-                    tabInfo.content = edit.new_content; // Update stored content
-
-                    // If this is the active tab, reload to show standard editor
-                    if (this.activeTab === edit.file_path) {
-                        this.setActiveTab(edit.file_path);
-                    }
-                }
-            }
-            this.showNotification('Changes applied!', 'success');
-            this.refreshFileTree();
-
-            // Reload current tab just in case
-            if (this.activeTab) this.setActiveTab(this.activeTab);
-
-        } catch (error) {
-            this.showNotification(`Error: ${error.message}`, 'error');
-        }
-    }
 
     setChatMode(mode) {
         this.currentMode = mode;
@@ -2726,6 +2735,8 @@ class CodeEditor {
     }
 
     async sendAIMessage() {
+        if (this.isProcessing) return;
+
         const input = document.getElementById('ai-input');
         if (!input) {
             console.error('AI input element not found');
@@ -2835,10 +2846,15 @@ class CodeEditor {
             };
 
             // Check Mode
+            this.isProcessing = true;
+            this.updateSendButtonState(true);
+            
             if (this.currentMode === 'agent') {
                 // Agent Mode: Use Multi-File Workflow
                 this.hideAITypingIndicator();
                 await this.handleMultiFileEdit(message);
+                this.isProcessing = false;
+                this.updateSendButtonState(false);
                 return;
             } else {
                 // Chat Mode: Use Standard RAG Chat
@@ -2850,6 +2866,8 @@ class CodeEditor {
                 } else {
                     this.addAIMessage('ai', `**Error:** ${response.error}`);
                 }
+                this.isProcessing = false;
+                this.updateSendButtonState(false);
                 return;
             }
 
@@ -2857,8 +2875,19 @@ class CodeEditor {
 
         } catch (error) {
             this.hideAITypingIndicator();
+            this.isProcessing = false;
+            this.updateSendButtonState(false);
             console.error('AI chat error:', error);
             this.addAIMessage('ai', `**Chat Error:** ${error.message}\n\nMake sure Flask backend is running: python app.py in backend directory`);
+        }
+    }
+
+    updateSendButtonState(isProcessing) {
+        const btn = document.getElementById('send-ai-message');
+        if (btn) {
+            btn.disabled = isProcessing;
+            btn.style.opacity = isProcessing ? '0.5' : '1';
+            btn.style.cursor = isProcessing ? 'not-allowed' : 'pointer';
         }
     }
 
@@ -2902,14 +2931,30 @@ class CodeEditor {
             this.hideAITypingIndicator();
 
             if (result.success) {
-                // Show Plan
-                if (result.plan) {
-                    this.addAIMessage('ai', `**Plan:**\n${result.plan}\n\nReviewing changes...`);
+                if (result.edits && result.edits.length > 0) {
+                    const newFiles = result.edits.filter(e => e.is_new).map(e => this.getFileNameFromPath(e.file_path));
+                    const modifiedFiles = result.edits.filter(e => !e.is_new).map(e => this.getFileNameFromPath(e.file_path));
+
+                    let summary = '';
+
+                    // Add File Summary
+                    summary += `### Proposed Changes\n`;
+                    if (newFiles.length > 0) summary += newFiles.map(f => `- **[NEW]** \`${f}\``).join('\n') + '\n';
+                    if (modifiedFiles.length > 0) summary += modifiedFiles.map(f => `- **[MOD]** \`${f}\``).join('\n') + '\n';
+                    
+                    summary += `\n**Status:** Opening ${result.edits.length} files for review...`;
+                    
+                    this.addAIMessage('ai', summary);
+                } else if (result.plan) {
+                    this.addAIMessage('ai', result.plan);
                 }
 
                 // Cursor-like Review: Open tabs and set them to Diff Mode
                 if (result.edits && result.edits.length > 0) {
-                    this.addAIMessage('ai', `I've proposed changes for ${result.edits.length} files. Opening them for review...`);
+                    // Message already sent above
+
+                    // Store edits for review actions (Accept/Reject)
+                    this.pendingEdits = result.edits;
 
                     for (const edit of result.edits) {
                         // PRE-FIX: Resolve path against workspace if it looks relative
@@ -2992,6 +3037,9 @@ class CodeEditor {
                         this.setActiveTab(result.edits[0].file_path);
                     }
 
+                    // Show Review Panel
+                    this.showEditPreview(result.edits);
+
                 } else {
                     this.addAIMessage('ai', `Analyzed context but found no code changes needed.`);
                 }
@@ -3038,14 +3086,6 @@ class CodeEditor {
                 <div class="review-title">
                     <i class="fas fa-edit"></i> Review Changes (${edits.length})
                 </div>
-                <div class="review-actions">
-                    <button class="btn-review btn-reject" onclick="codeEditor.rejectEdits()">
-                        <i class="fas fa-times"></i> Reject
-                    </button>
-                    <button class="btn-review btn-accept" onclick="codeEditor.acceptEdits()">
-                        <i class="fas fa-check"></i> Accept
-                    </button>
-                </div>
             </div>
             <div class="review-files">
                 ${fileListHtml}
@@ -3084,6 +3124,10 @@ class CodeEditor {
             diffContainer.innerHTML = `
                 <div class="diff-editor-header">
                     <span style="font-weight:600; margin-right:10px;">Diff: ${this.getFileNameFromPath(edit.file_path)}</span>
+                    <div class="diff-actions" style="display:flex; gap:10px; margin-right:auto; margin-left:20px;">
+                        <button class="btn-review btn-accept" onclick="codeEditor.acceptSingleEdit(${editIndex})" style="padding: 4px 12px; font-size: 12px; background: #4caf50; border: none; color: white; border-radius: 4px; cursor: pointer;">Accept</button>
+                        <button class="btn-review btn-reject" onclick="codeEditor.rejectSingleEdit(${editIndex})" style="padding: 4px 12px; font-size: 12px; background: #f44336; border: none; color: white; border-radius: 4px; cursor: pointer;">Reject</button>
+                    </div>
                     <span class="diff-editor-close" onclick="codeEditor.closeDiffView()">
                         <i class="fas fa-times"></i>
                     </span>
@@ -3142,10 +3186,131 @@ class CodeEditor {
         this.pendingEdits = [];
     }
 
+    async acceptSingleEdit(index) {
+        if (!this.pendingEdits || !this.pendingEdits[index]) return;
+        const edit = this.pendingEdits[index];
+        
+        this.showNotification(`Accepting changes for ${this.getFileNameFromPath(edit.file_path)}...`, 'info');
+        
+        try {
+            await this.applySingleEdit(edit);
+            
+            this.closeDiffView();
+            
+            // Explicitly hide the Tab-based diff container
+            const diffContainerTab = document.getElementById('diff-editor-container-tab');
+            if (diffContainerTab) diffContainerTab.style.display = 'none';
+
+            // Remove from list
+            this.pendingEdits.splice(index, 1);
+            
+            if (this.pendingEdits.length === 0) {
+                 const panel = document.querySelector('.review-panel');
+                 if (panel) panel.remove();
+                 this.showNotification('All changes handled.', 'success');
+                 this.indexCodebase();
+            } else {
+                 this.showEditPreview(this.pendingEdits);
+            }
+            
+        } catch (e) {
+             this.showNotification(`Error accepting edit: ${e.message}`, 'error');
+        }
+    }
+
+    async rejectSingleEdit(index) {
+        if (!this.pendingEdits || !this.pendingEdits[index]) return;
+        const edit = this.pendingEdits[index];
+        
+        try {
+            // Revert State
+            if (edit.is_new) {
+                // For new files, we just close the tab.
+                // But first, ensure we don't try to "save" it when switching tabs in closeTab
+                // (The setActiveTab fix handles this if isDiff is true, but let's be safe)
+                this.closeTab(edit.file_path);
+            } else {
+                let filePath = edit.file_path;
+                 if (!this.tabs.has(filePath)) filePath = this.normalizePath(filePath);
+                 
+                 if (this.tabs.has(filePath)) {
+                     const tabInfo = this.tabs.get(filePath);
+                     tabInfo.isDiff = false;
+                     tabInfo.editData = null;
+                     
+                     // Restore original content
+                     if (edit.original_content !== undefined) {
+                         tabInfo.content = edit.original_content;
+                     }
+                     tabInfo.element.classList.remove('review-mode');
+                     
+                     // If this is the active tab, we MUST force the editor to show the original content
+                     if (this.activeTab === filePath && this.editor) {
+                         this.editor.setValue(tabInfo.content);
+                     }
+                 }
+            }
+            
+            this.closeDiffView();
+
+            // Explicitly hide the Tab-based diff container if it exists
+            const diffContainerTab = document.getElementById('diff-editor-container-tab');
+            if (diffContainerTab) diffContainerTab.style.display = 'none';
+            
+            this.pendingEdits.splice(index, 1);
+            
+            if (this.pendingEdits.length === 0) {
+                 const panel = document.querySelector('.review-panel');
+                 if (panel) panel.remove();
+                 this.showNotification('All changes handled.', 'success');
+            } else {
+                 this.showEditPreview(this.pendingEdits);
+            }
+            
+        } catch (e) {
+             console.error(e);
+             this.showNotification('Error rejecting edit', 'error');
+        }
+    }
+
+    async applySingleEdit(edit) {
+        console.log(`Applying edit for ${edit.file_path}`);
+        
+        if (edit.is_new) {
+            await window.electronAPI.createFile({
+                folderPath: this.workspacePath,
+                fileName: this.getFileNameFromPath(edit.file_path)
+            });
+        }
+
+        await window.electronAPI.saveFile({
+            filePath: edit.file_path,
+            content: edit.new_content
+        });
+
+        // Reset Tab State
+        let filePath = edit.file_path;
+        if (!this.tabs.has(filePath)) {
+             filePath = this.normalizePath(filePath);
+        }
+
+        if (this.tabs.has(filePath)) {
+            const tabInfo = this.tabs.get(filePath);
+            tabInfo.isDiff = false;
+            tabInfo.editData = null;
+            tabInfo.content = edit.new_content; 
+
+            tabInfo.element.classList.remove('review-mode');
+            
+            if (this.activeTab === filePath && this.editor) {
+                this.editor.setValue(tabInfo.content);
+            }
+        }
+    }
+
     async applyAllEdits(edits) {
         if (!edits || edits.length === 0) return;
 
-        // Show progress?
         this.showNotification(`Applying ${edits.length} edits...`, 'info');
 
         for (const edit of edits) {
@@ -3153,17 +3318,73 @@ class CodeEditor {
         }
 
         this.showNotification('All edits applied successfully', 'success');
-
-        // Auto-reindex after changes
         this.indexCodebase();
     }
 
     rejectEdits() {
-        const panel = document.querySelector('.review-panel');
-        if (panel) panel.remove();
-        this.closeDiffView();
-        this.pendingEdits = [];
-        this.addAIMessage('ai', '❌ Changes rejected.');
+        console.log('Rejecting edits...');
+        this.showNotification('Rejecting changes...', 'info');
+        
+        try {
+            if (this.pendingEdits && this.pendingEdits.length > 0) {
+                console.log(`Processing rejection for ${this.pendingEdits.length} edits`);
+                
+                this.pendingEdits.forEach(edit => {
+                    if (edit.is_new) {
+                        // For new files, we just want to close the tab effectively cancelling creation
+                        console.log(`Closing new file tab: ${edit.file_path}`);
+                        this.closeTab(edit.file_path);
+                    } else {
+                        // For existing files, revert to original content and turn off diff mode
+                        console.log(`Reverting existing file: ${edit.file_path}`);
+                        const filePath = this.normalizePath(edit.file_path);
+                        
+                        if (this.tabs.has(filePath)) {
+                            const tabInfo = this.tabs.get(filePath);
+                            
+                            // Reset Tab State
+                            tabInfo.isDiff = false;
+                            tabInfo.editData = null;
+                            
+                            // crucial: ensure we revert to original content
+                            if (edit.original_content !== undefined) {
+                                tabInfo.content = edit.original_content;
+                            }
+                            
+                            // Update UI
+                            tabInfo.element.classList.remove('review-mode');
+                            
+                            // If this is active tab, force refresh editor
+                            if (this.activeTab === filePath) {
+                                if (this.editor) {
+                                    this.editor.setValue(tabInfo.content);
+                                    
+                                    // Hide Diff View
+                                    const diffContainer = document.getElementById('diff-editor-container-tab');
+                                    if (diffContainer) diffContainer.style.display = 'none';
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.log('No pending edits found to reject');
+            }
+
+            // Cleanup UI
+            const panel = document.querySelector('.review-panel');
+            if (panel) panel.remove();
+            
+            // Clear pending edits
+            this.pendingEdits = [];
+            
+            this.addAIMessage('ai', '❌ Changes rejected. Your files have been restored.');
+            this.showNotification('Edits rejected successfully', 'success');
+            
+        } catch (error) {
+            console.error('Error rejecting edits:', error);
+            this.showNotification('Failed to reject edits', 'error');
+        }
     }
 
     async indexCodebase() {
@@ -3285,7 +3506,72 @@ class CodeEditor {
         messages.scrollTop = messages.scrollHeight;
     }
 
+    configureMarked() {
+        if (typeof marked === 'undefined') return;
+        
+        const renderer = new marked.Renderer();
+        
+        // Custom code block renderer
+        renderer.code = (code, language) => {
+            const validLanguage = Prism.languages[language] ? language : 'javascript';
+            const highlighted = Prism.languages[validLanguage] ? 
+                Prism.highlight(code, Prism.languages[validLanguage], validLanguage) : 
+                this.escapeHtml(code);
+                
+            return `
+                <div class="code-block-wrapper">
+                    <div class="code-block-header">
+                        <span class="code-language">${validLanguage}</span>
+                        <button class="copy-btn" onclick="codeEditor.copyToClipboard(this)">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                    <pre><code class="language-${validLanguage}">${highlighted}</code></pre>
+                    <div class="code-content" style="display:none">${this.escapeHtml(code)}</div>
+                </div>
+            `;
+        };
+
+        marked.setOptions({
+            renderer: renderer,
+            highlight: function(code, lang) {
+                if (Prism.languages[lang]) {
+                    return Prism.highlight(code, Prism.languages[lang], lang);
+                } else {
+                    return code;
+                }
+            },
+            pedantic: false,
+            gfm: true,
+            breaks: true,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false,
+            xhtml: false
+        });
+    }
+
     formatAIContent(content) {
+        if (typeof marked === 'undefined') {
+            // Fallback if marked is not loaded
+            return this.simpleFormat(content);
+        }
+        
+        // Ensure marked is configured
+        if (!this.markedConfigured) {
+            this.configureMarked();
+            this.markedConfigured = true;
+        }
+        
+        try {
+            return marked.parse(content);
+        } catch (e) {
+            console.error('Error parsing markdown:', e);
+            return this.simpleFormat(content);
+        }
+    }
+
+    simpleFormat(content) {
         let formatted = content
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -3298,6 +3584,22 @@ class CodeEditor {
         });
 
         return formatted;
+    }
+
+    copyToClipboard(btn) {
+        const wrapper = btn.closest('.code-block-wrapper');
+        const content = wrapper.querySelector('.code-content').textContent;
+        
+        navigator.clipboard.writeText(content).then(() => {
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            btn.classList.add('copied');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('copied');
+            }, 2000);
+        });
     }
 
     escapeHtml(text) {
@@ -3960,5 +4262,15 @@ window.addEventListener('beforeunload', () => {
     if (window.codeEditor) {
         window.codeEditor.cleanup();
     }
+});
 
+// Initialize CodeEditor
+window.addEventListener('DOMContentLoaded', () => {
+    try {
+        console.log('Initializing CodeEditor...');
+        window.codeEditor = new CodeEditor();
+        console.log('CodeEditor initialized and assigned to window.codeEditor');
+    } catch (error) {
+        console.error('Failed to initialize CodeEditor:', error);
+    }
 });
