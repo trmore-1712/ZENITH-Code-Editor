@@ -24,6 +24,9 @@ class CodeEditor {
         this.diffEditor = null; // Monaco Diff Editor instance
 
         this.currentMode = 'chat'; // 'chat' or 'agent'
+        this.vizRealTime = false;
+        this.vizDebounceTimeout = null;
+        this.isVisualizing = false;
         this.init();
     }
 
@@ -720,6 +723,36 @@ class CodeEditor {
             });
         }
 
+        // Real-time Visualization Toggle
+        const realtimeVizToggle = document.getElementById('realtime-viz-toggle');
+        if (realtimeVizToggle) {
+            realtimeVizToggle.addEventListener('change', (e) => {
+                this.vizRealTime = e.target.checked;
+                const icon = realtimeVizToggle.nextElementSibling;
+                if (this.vizRealTime) {
+                    icon.style.color = '#007acc';
+                    icon.classList.add('fa-spin');
+                    this.visualizeAlgorithm(); // Initial run
+                } else {
+                    icon.style.color = '#858585';
+                    icon.classList.remove('fa-spin');
+                }
+            });
+        }
+
+        // Debounced visualization for scratchpad
+        const scratchpad = document.querySelector('.scratchpad-area');
+        if (scratchpad) {
+            scratchpad.addEventListener('input', () => {
+                if (this.vizRealTime) {
+                    clearTimeout(this.vizDebounceTimeout);
+                    this.vizDebounceTimeout = setTimeout(() => {
+                        this.visualizeAlgorithm();
+                    }, 1500); // 1.5s debounce for AI generation
+                }
+            });
+        }
+
         const pullBtn = document.getElementById('gh-pull');
         if (pullBtn) {
             pullBtn.addEventListener('click', async () => {
@@ -1050,52 +1083,62 @@ class CodeEditor {
             return;
         }
 
-        this.showNotification('Generating visualization... This may take a moment.', 'info');
+        // Avoid overlapping requests
+        if (this.isVisualizing) return;
+        this.isVisualizing = true;
 
-        // Show panel with loading
+        // Show panel with loading if not already visible
         const panel = document.getElementById('visualization-panel');
         const wrapper = document.getElementById('monaco-wrapper');
         const iframe = document.getElementById('viz-frame');
 
-        wrapper.style.display = 'none';
-        panel.style.display = 'flex';
+        if (panel.style.display === 'none') {
+            wrapper.style.display = 'none';
+            panel.style.display = 'flex';
+        }
 
-        // Set loading state in iframe
-        const loadingHtml = `
-            <style>
-                body { background: #1e1e1e; color: #ccc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .loader { border: 4px solid #333; border-top: 4px solid #007acc; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            </style>
-            <div style="text-align: center;">
-                <div class="loader" style="margin: 0 auto 20px;"></div>
-                <div>Generating AI Visualization...</div>
-            </div>
-        `;
-        iframe.srcdoc = loadingHtml;
+        // Set loading state in iframe if it's the first time or not showing content
+        if (!iframe.srcdoc || iframe.srcdoc.includes('loader')) {
+            const loadingHtml = `
+                <style>
+                    body { background: #1e1e1e; color: #ccc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; }
+                    .loader { border: 4px solid #333; border-top: 4px solid #007acc; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                </style>
+                <div style="text-align: center;">
+                    <div class="loader" style="margin: 0 auto 20px;"></div>
+                    <div style="font-size: 14px; letter-spacing: 1px;">GENERATING DYNAMIC VISUALIZATION...</div>
+                </div>
+            `;
+            iframe.srcdoc = loadingHtml;
+        }
 
         try {
+            // Simple language detection for scratchpad
+            let lang = 'javascript';
+            if (code.includes('def ') || code.includes('import ') || code.includes('print(')) lang = 'python';
+            else if (code.includes('public class') || code.includes('System.out')) lang = 'java';
+
             const response = await fetch('http://127.0.0.1:5000/api/visualize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code, language: 'javascript' }) // Assume JS for scratchpad or detect
+                body: JSON.stringify({ code: code, language: lang })
             });
 
             const data = await response.json();
 
             if (data.success) {
-                // Inject the visualization HTML
-                // We use srcdoc to safely isolate it (somewhat) and ensure it renders as a document
+                // Keep scale and interactivity
                 iframe.srcdoc = data.visualization;
-                this.showNotification('Visualization generated!', 'success');
+                if (!this.vizRealTime) this.showNotification('Visualization updated!', 'success');
             } else {
-                iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Error: ${data.error}</div>`;
-                this.showNotification('Failed to generate visualization', 'error');
+                iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px; background: #1e1e1e; height: 100vh;"><h3>Visualization Error</h3><p>${data.error}</p></div>`;
             }
         } catch (error) {
             console.error('Visualization error:', error);
-            iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px;">Connection Error: ${error.message}</div>`;
-            this.showNotification('Error connecting to backend', 'error');
+            iframe.srcdoc = `<div style="color: #ff5f56; padding: 20px; background: #1e1e1e; height: 100vh;"><h3>Connection Error</h3><p>${error.message}</p></div>`;
+        } finally {
+            this.isVisualizing = false;
         }
     }
 
