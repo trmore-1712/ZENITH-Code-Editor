@@ -1144,6 +1144,78 @@ body {
     transform: translateY(-2px);
 }
 
+/* Markdown Styles */
+.message-text h1, 
+.message-text h2, 
+.message-text h3, 
+.message-text h4, 
+.message-text h5, 
+.message-text h6 {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.3;
+}
+
+.message-text h1 { font-size: 1.4em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+.message-text h2 { font-size: 1.3em; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+.message-text h3 { font-size: 1.2em; }
+.message-text h4 { font-size: 1.1em; }
+
+.message-text p {
+    margin-bottom: 10px;
+}
+
+.message-text p:last-child {
+    margin-bottom: 0;
+}
+
+.message-text ul, .message-text ol {
+    margin-bottom: 10px;
+    padding-left: 20px;
+}
+
+.message-text li {
+    margin-bottom: 4px;
+}
+
+.message-text a {
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.message-text a:hover {
+    text-decoration: underline;
+}
+
+.message-text blockquote {
+    border-left: 3px solid var(--accent-blue);
+    margin: 10px 0;
+    padding-left: 10px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+
+.message-text table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+}
+
+.message-text th, .message-text td {
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.message-text th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+}
+
 .message-text strong {
     color: #ffffff;
     font-weight: 600;
@@ -1154,12 +1226,96 @@ body {
     font-style: italic;
 }
 
-.message-text code {
+/* Inline Code */
+.message-text :not(pre) > code {
     background: rgba(255, 255, 255, 0.1);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
+    color: #ce9178;
+}
+
+/* Enhanced Code Block Styles */
+.code-block-wrapper {
+    margin: 12px 0;
+    background: #1e1e1e;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.code-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: #252526;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.code-language {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 600;
+    font-family: sans-serif;
+}
+
+.copy-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.copy-btn.copied {
+    color: var(--accent-green);
+}
+
+.code-block-wrapper pre {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    background: #1e1e1e !important; /* Override Prism background if needed */
+}
+
+.code-block-wrapper code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: transparent !important;
+    text-shadow: none !important;
+}
+
+/* Scrollbar for code blocks */
+.code-block-wrapper pre::-webkit-scrollbar {
+    height: 8px;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .ai-chat-input {
