@@ -1,9 +1,5 @@
 <h1 align="center">
-  <a href="https://github.com/CommunityOfCoders/Inheritance2k25">
-    CoC Inheritance 2025
-  </a>
-  <br>
-  Zenith: The AI-Native Code Editor
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&pause=1000&color=00BFFF&center=true&vCenter=true&width=435&lines=Zenith:+The+AI-Native+Code+Editor;Agentic+Intelligence+Embeded;Plan,+Execute,+Verify+Complex+Tasks;Revolutionizing+Dev+Workflows" alt="Typing SVG" />
 </h1>
 
 <div align="center">
@@ -41,41 +37,33 @@ Zenith is an **Agentic AI Code Editor** that transforms software development by 
 
 ## 🏗️ System Architecture
 
-![Zenith System Architecture](docs/architecture.svg)
+<div align="center">
 
-## 🛠️ Tech Stack
+![Zenith System Architecture](https://gist.githubusercontent.com/trmore-1712/8aa4cd661df1ef21aac4cfcf41d9d2af/raw/73334a0814c7dedbbd7cf260994692929d3381e6/architecture.svg)
 
-### Frontend
-- **Electron**: Cross-platform desktop application framework.
-- **Vanilla JavaScript**: Lightweight, high-performance rendering logic.
-- **Monaco Editor**: The core editor that capabilities VS Code.
-- **Xterm.js**: Full-featured terminal emulator.
-- **Node-pty**: Native terminal process management.
-
-### Backend
-- **Python & Flask**: Robust API handling AI requests and file operations.
-- **LangChain & LangGraph**: State-of-the-art framework for building context-aware, reasoning agents.
-- **Google Generative AI (Gemini)**: Fast, efficient LLM for code generation.
-- **ChromaDB**: Vector database for high-speed code retrieval (RAG).
-- **Tree-sitter**: Incremental parsing system for robust code analysis.
-- **GitPython**: Programmatic interface for Git operations.
+</div>
 
 ---
 
-## 📈 Progress
+## 🛠️ Tech Stack
 
-### Fully Implemented Features
-- [x] **Agentic AI Chat**: Plan and execute multi-file edits using LangGraph.
-- [x] **RAG System**: Context-aware code understanding with ChromaDB.
-- [x] **Code Editor UI**: Modern Monaco-based editor with glassmorphism.
-- [x] **Terminal**: Integrated xterm.js terminal.
-- [x] **File Management**: Create, delete, rename files and folders.
-- [x] **Algorithm Visualizer**: Real-time visualization for Python/JS algorithms.
-- [x] **Git Integration**: View history, commit, push, pull.
+### **Frontend**
+| Tech | Description |
+| :--- | :--- |
+| **Electron** | Cross-platform desktop framework |
+| **Vanilla JS** | High-performance rendering logic |
+| **Monaco Editor** | The core editor engine (VS Code) |
+| **Xterm.js** | Full-featured terminal emulator |
 
-### Work in Progress
-- [ ] **Extension Marketplace**: Plugin system structure is in place, content pending.
-- [ ] **Real-time Collaboration**: WebSocket infrastructure ready, implementation pending.
+### **Backend**
+| Tech | Description |
+| :--- | :--- |
+| **Python & Flask** | robust API & AI orchestration |
+| **LangChain & LangGraph** | Agentic cognitive architecture |
+| **Google Gemini 1.5** | High-speed, large-context LLM |
+| **ChromaDB** | Vector store for RAG memory |
+| **Tree-sitter** | Incremental AST parsing |
+| **GitPython** | Programmatic VCS control |
 
 ---
 
@@ -126,34 +114,19 @@ Zenith is an **Agentic AI Code Editor** that transforms software development by 
 
 ---
 
-## 🔮 Future Roadmap
+## 👥 Contributors
 
-- [ ] **Extension Marketplace**: A fully functional plugin system for community themes and tools.
-- [ ] **Real-time Collaboration**: Google Docs-style live coding.
-- [ ] **Multi-Model Support**: Switch between GPT-4, Claude, and Llama locally.
+<div align="center">
 
----
+| [Tanmay](https://github.com/trmore-1712) | [Neelay](https://github.com/crazy-coder-neel) | [Kavya](https://github.com/champ-byte) | [Pakshal](https://github.com/impakshal) |
+| :---: | :---: | :---: | :---: |
 
-## 💸 Applications
-
-1.  **Automated Refactoring**: Agents can handle large-scale generic refactors (e.g., "Migrate all print statements to logging").
-2.  **Educational Tools**: The Algorithm Visualizer helps students understand complex logic visually.
-3.  **Rapid Prototyping**: Generating boilerplate and basic logic via natural language speed up development.
+</div>
 
 ---
 
-## 👥 Team
+<div align="center">
 
-- **Tanmay**: [\[Github Profile Link\]](https://github.com/trmore-1712)
-- **Neelay**: [\[GitHub Profile Link\]](https://github.com/crazy-coder-neel)
-- **Kavya**: [\[GitHub Profile Link\]](https://github.com/champ-byte)
-- **Pakshal**: [\[GitHub Profile Link\]](https://github.com/impakshal)
+Made with ❤️ and 🤖 using **Zenith**
 
-## 👨‍🏫 Mentors
-
-- **Soham Rane**
-- **Harshal Kamble**
-
----
-
-Made with ❤️ and 🤖 using **Zenith**.
+</div>
