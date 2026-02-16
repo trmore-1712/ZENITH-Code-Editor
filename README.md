@@ -33,7 +33,7 @@ Zenith is an **Agentic AI Code Editor** that transforms software development by 
 - [GitHub Repository](https://github.com/trmore-1712/ZENITH-Code-Editor)
 - [Demo Video](https://drive.google.com/drive/folders/196SytJDcQ2NA7I5MWv2zz1liEZLUuo0i?usp=sharing)
 - [Project Screenshots/Drive](https://drive.google.com/drive/folders/1SeIiYxbn9hZqCycA3bIZA7Myiu4YUk3i?usp=sharing)
-- [Hosted Website]([Insert Link])
+
 
 ## 🏗️ System Architecture
 
