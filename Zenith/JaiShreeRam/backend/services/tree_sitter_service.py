@@ -1,19 +1,8 @@
-
 import os
 import logging
 from typing import List, Dict, Any, Optional
 import tree_sitter
-try:
-    from tree_sitter import Language, Parser
-except ImportError:
-    # Handle older versions or specific bindings if needed, but 0.22+ is standard
-    pass
-
-# Import language bindings
-# Note: In a real environment, we'd need to ensure these are installed and compiled/accessible.
-# Since we are adding them to requirements.txt, we assume they are available.
-# However, mapping them to Language objects requires pointing to the library file (.so/.dll) 
-# OR using the new bindings like `tree_sitter_python.language()` in v0.22+
+from tree_sitter import Language, Parser
 
 logger = logging.getLogger(__name__)
 
