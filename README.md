@@ -3,7 +3,7 @@
     CoC Inheritance 2025
   </a>
   <br>
-  [Zenith]: [The AI-Native Code Editor]
+  Zenith: The AI-Native Code Editor
 </h1>
 
 <div align="center">
@@ -144,15 +144,15 @@ Zenith is an **Agentic AI Code Editor** that transforms software development by 
 
 ## 👥 Team
 
-- **[Tanmay]**: [\[Github Profile Link\]](https://github.com/trmore-1712)
-- **[Neelay]**: [\[GitHub Profile Link\]](https://github.com/crazy-coder-neel)
-- **[Kavya]**: [\[GitHub Profile Link\]](https://github.com/champ-byte)
-- **[Pakshal]**: [\[GitHub Profile Link\]](https://github.com/impakshal)
+- **Tanmay**: [\[Github Profile Link\]](https://github.com/trmore-1712)
+- **Neelay**: [\[GitHub Profile Link\]](https://github.com/crazy-coder-neel)
+- **Kavya**: [\[GitHub Profile Link\]](https://github.com/champ-byte)
+- **Pakshal**: [\[GitHub Profile Link\]](https://github.com/impakshal)
 
 ## 👨‍🏫 Mentors
 
-- **[Soham Rane]**
-- **[Harshal Kamble]**
+- **Soham Rane**
+- **Harshal Kamble**
 
 ---
 
