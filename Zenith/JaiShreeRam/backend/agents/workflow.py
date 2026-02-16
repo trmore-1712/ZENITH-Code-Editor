@@ -42,23 +42,19 @@ class MultiFileEditWorkflow:
         """Analyze files using RAG for discovery and AST/Regex for structure"""
         logger.info("Analyzing context for multi-file edit")
         
-        # 1. RAG Discovery (Hybrid Strategy)
         discovered_files = set(state.get("files", []))
         rag_context = ""
         
         if self.rag_service:
             try:
-                # Infer relevant files from the task even if not explicitly mentioned
                 logger.info(f"Querying RAG for task: {state['task']}")
                 search_result = self.rag_service.query_with_context(state['task'])
                 rag_context = search_result.get("context", "")
                 
-                # Extract filenames from RAG content (File: ...) logic or sources
+                
                 for source in search_result.get("sources", []):
-                    # Only add if it's a file in the project (rag sources are usually relative paths or filenames)
+                   
                     if source and source != "unknown":
-                         # Heuristic: if it looks like a file path, add it
-                         # Sources from rag_service are usually filenames
                          import os
                          if os.path.exists(source) or (self.rag_service.current_indexed_path and os.path.exists(os.path.join(self.rag_service.current_indexed_path, source))):
                              if self.rag_service.current_indexed_path and not os.path.isabs(source):
@@ -72,10 +68,8 @@ class MultiFileEditWorkflow:
             except Exception as e:
                 logger.error(f"RAG discovery failed: {e}")
 
-        # Update state with discovered files so subsequent steps see them
+     
         state["files"] = list(discovered_files)
-
-        # 2. Structure Analysis (AST/Content/Tree-sitter)
         analysis_results = []
         if rag_context:
             analysis_results.append("--- RAG Context (Relevant Snippets) ---")
@@ -93,7 +87,7 @@ class MultiFileEditWorkflow:
                 
                 analysis_results.append(f"--- File: {os.path.basename(file_path)} ---")
                 
-                # Use Tree-sitter if available
+                
                 if self.tree_sitter_service:
                     structure = self.tree_sitter_service.parse_file(file_path, content)
                     if "error" in structure:
@@ -103,7 +97,6 @@ class MultiFileEditWorkflow:
                          analysis_results.append(f"Classes={structure.get('classes', [])}")
                          analysis_results.append(f"Functions={structure.get('functions', [])}")
                 else:
-                    # Fallback (Simple read) or old AST logic if desired, but we are replacing it.
                     analysis_results.append("Structure: (Tree-sitter not available)")
                     
             except Exception as e:
@@ -175,7 +168,7 @@ class MultiFileEditWorkflow:
              resp = self.llm_service.precise_llm.invoke(candidates_msg)
              content = resp.content.strip()
              
-             # Robust Parsing Strategy
+             
              target_files = []
              match = re.search(r"\[.*\]", content, re.DOTALL)
              if match:
@@ -198,7 +191,7 @@ class MultiFileEditWorkflow:
         import os
         
         for file_path in target_files:
-             # Check if file exists to decide prompt nuance
+            
              file_exists = os.path.exists(file_path)
              original_content = ""
              
@@ -206,7 +199,7 @@ class MultiFileEditWorkflow:
                  with open(file_path, "r", encoding="utf-8") as f:
                      original_content = f.read()
                  
-                 # TOKEN SAVER: Use SEARCH/REPLACE for existing files
+                 
                  prompt = f"""
                  Based on the plan, apply changes to: {file_path}
                  
@@ -251,8 +244,6 @@ class MultiFileEditWorkflow:
 
             
              if prompt_type == "PATCH":
-                 # Extract hunks manually without applying them
-                 # Parse blocks: <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE
                  import re
                  pattern = r"<{7}\s*SEARCH\s*\n(.*?)\n={7}\s*\n(.*?)\n>{7}\s*REPLACE"
                  matches = list(re.finditer(pattern, generated_text, re.DOTALL))
@@ -264,7 +255,6 @@ class MultiFileEditWorkflow:
                          "replace": match.group(2)
                      })
                  
-                 # Optimization: Don't calculate diff here, just send hunks.
                  edits.append({
                     "file_path": file_path,
                     "hunks": hunks,
@@ -272,7 +262,6 @@ class MultiFileEditWorkflow:
                  })
                  
              else:
-                 # New file
                  new_content = generated_text
                  match = re.search(r"```(?:\w+)?\n(.*?)\n```", new_content, re.DOTALL)
                  if match: new_content = match.group(1)
@@ -280,7 +269,7 @@ class MultiFileEditWorkflow:
                  edits.append({
                     "file_path": file_path,
                     "new_content": new_content,
-                    "hunks": [], # No hunks for new file
+                    "hunks": [], 
                     "is_new": True
                  })
         

@@ -20,7 +20,6 @@ class TreeSitterService:
     def _initialize_parsers(self):
         """Initialize parsers for supported languages"""
         try:
-            # Python
             try:
                 import tree_sitter_python
                 PY_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
@@ -33,7 +32,6 @@ class TreeSitterService:
             except Exception as e:
                 logger.warning(f"Failed to load python parser: {e}")
 
-            # JavaScript
             try:
                 import tree_sitter_javascript
                 JS_LANGUAGE = tree_sitter.Language(tree_sitter_javascript.language())
@@ -46,7 +44,6 @@ class TreeSitterService:
             except Exception as e:
                 logger.warning(f"Failed to load javascript parser: {e}")
 
-            # TypeScript
             try:
                 import tree_sitter_typescript
                 TS_LANGUAGE = tree_sitter.Language(tree_sitter_typescript.language_typescript())
@@ -113,11 +110,8 @@ class TreeSitterService:
         classes = []
         functions = []
 
-        # Queries based on language
+        
         if language == 'python':
-            # Simple interaction for now, query API is cleaner but traversal is universally understood
-            # Function definitions
-            # Class definitions
             queries = {
                 'class': '(class_definition name: (identifier) @name)',
                 'function': '(function_definition name: (identifier) @name)'
@@ -134,18 +128,11 @@ class TreeSitterService:
         else:
             return {'classes': [], 'functions': []}
 
-        # Use tree-sitter query API
         try:
             lang_obj = self.languages[language]
             
-            # Extract Classes
             class_query_str = queries['class']
-            if isinstance(class_query_str, list): class_query_str = " ".join(class_query_str) # Incorrect for OR, need separate queries or combining
-            
-            # Simplified Traversal approach for robustness without perfecting exact query syntax 
-            # (since query syntax can be strict and version-dependent)
-            # We will use a recursive traversal which is verbose but reliable.
-            
+            if isinstance(class_query_str, list): class_query_str = " ".join(class_query_str) 
             self._traverse_node(node, classes, functions, language)
             
         except Exception as e:
@@ -171,8 +158,6 @@ class TreeSitterService:
                 name = self._get_node_name(node)
                 if name: functions.append(name)
             elif type == 'variable_declarator':
-                # Check for arrow function assignment: const foo = () => {}
-                # child_by_field_name('value') -> arrow_function
                 value_node = node.child_by_field_name('value')
                 if value_node and value_node.type == 'arrow_function':
                     name = self._get_node_name(node)
@@ -182,7 +167,6 @@ class TreeSitterService:
             self._traverse_node(child, classes, functions, language)
 
     def _get_node_name(self, node):
-        # Python/JS/TS usually have a 'name' field which is an identifier
         name_node = node.child_by_field_name('name')
         if name_node:
             return name_node.text.decode('utf8')

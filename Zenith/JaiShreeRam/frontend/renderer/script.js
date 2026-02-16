@@ -720,7 +720,7 @@ class CodeEditor {
         if (closeVizBtn) {
             closeVizBtn.addEventListener('click', () => {
                 document.getElementById('visualization-panel').style.display = 'none';
-                document.getElementById('monaco-wrapper').style.display = 'block';
+                document.getElementById('monaco-wrapper').style.display = 'flex';
             });
         }
 
@@ -1169,7 +1169,7 @@ class CodeEditor {
 
         window.electronAPI.onFileSaved((data) => {
             console.log('File saved:', data);
-            this.showNotification(`File saved: ${data.filePath}`, 'success');
+            // this.showNotification(`File saved: ${data.filePath}`, 'success');
             this.refreshFileTree();
         });
 
@@ -2223,7 +2223,7 @@ class CodeEditor {
                     }
 
                     this.openFile(filePath, content, fileName);
-                    this.showNotification('File saved successfully', 'success');
+                    // this.showNotification('File saved successfully', 'success');
                 } catch (error) {
                     this.showNotification(`Failed to save: ${error.message}`, 'error');
                 }
@@ -2366,7 +2366,7 @@ class CodeEditor {
             return;
         }
 
-        this.showNotification('Indexing codebase for RAG...', 'info');
+        // this.showNotification('Indexing codebase for RAG...', 'info');
         try {
             const result = await window.electronAPI.indexCodebase(this.workspacePath);
             if (result.success) {
@@ -3439,12 +3439,12 @@ class CodeEditor {
         }
 
         // Visual feedback on the toggle label or notification
-        this.showNotification('Indexing codebase...', 'info');
+        // this.showNotification('Indexing codebase...', 'info');
         try {
             const result = await window.electronAPI.indexCodebase(this.workspacePath);
 
             if (result.success) {
-                this.showNotification(`Indexed ${result.files} files`, 'success');
+                // this.showNotification(`Indexed ${result.files} files`, 'success');
             } else {
                 this.showNotification(`Indexing failed: ${result.error}`, 'error');
             }
