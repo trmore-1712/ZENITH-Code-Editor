@@ -1235,7 +1235,13 @@
                     <div class="sidebar-header">
                         <div class="sidebar-title">ALGORITHM PAD</div>
                         <div class="sidebar-actions">
-                            <i class="fas fa-play" title="Run Algo (Mock)"></i>
+                            <label class="switch-mini" title="Real-time Visualization"
+                                style="display: flex; align-items: center; gap: 5px; margin-right: 10px; cursor: pointer;">
+                                <input type="checkbox" id="realtime-viz-toggle" style="display: none;">
+                                <i class="fas fa-bolt" style="font-size: 10px; color: #858585;"></i>
+                                <span style="font-size: 9px; color: #858585;">LIVE</span>
+                            </label>
+                            <i class="fas fa-play" title="Generate Visualization"></i>
                             <i class="fas fa-trash-alt" title="Clear"></i>
                         </div>
                     </div>

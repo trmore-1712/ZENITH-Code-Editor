@@ -414,30 +414,39 @@ Examples:
             if language == "auto":
                 language = self._detect_language(code)
             
-            system_prompt = """You are an expert Algorithm Visualizer. 
-            Your task is to generate a single, self-contained HTML file (with embedded CSS and JS) that visualizes the execution of the provided algorithm.
+            system_prompt = """You are an expert Algorithm Visualizer and Creative Technologist. 
+            Your task is to generate a single, self-contained HTML file (with embedded CSS and JS) that provides a HIGHLY DYNAMIC and INTERACTIVE visualization of the provided algorithm.
             
-            Requirements:
-            1. The output MUST be a valid, runnable HTML file.
-            2. Use modern CSS for a premium, dark-mode VS Code aesthetic (GitHub Dark theme colors).
-            3. Implement the algorithm in JavaScript and visualize its steps (e.g., sorting bars, traversing graphs, moving pointers).
-            4. **Controls**: You MUST include a fixed control panel at the bottom with:
-               - [Custom Input] field (for user to change data, e.g., array values)
-               - [Set Data] button to apply input
-               - [ < Step Back ] button
-               - [ Play/Pause ] button
-               - [ Step Forward > ] button
-               - [ Reset ] button
-               - [Speed] slider
-            5. The visualization should be dynamic and interactive.
-            6. Do NOT require external libraries unless imported via CDN (prefer vanilla JS or D3.js via CDN).
-            7. **Step Explanation**: Display the current step's explanation in a clear text panel.
-            8. If the code is not an algorithm (e.g., just a function), try to visualize its flow or data transformation.
+            Visual Aesthetics:
+            - Use a premium, dark-mode "Cyberpunk" or "VS Code Dark" theme.
+            - Colors: Primary #007acc (blue), Secondary #4ec9b0 (teal), Highlight #ffbd2e (orange).
+            - Use smooth CSS transitions and subtle glow effects.
+            
+            Real-time & Movement:
+            - Use `requestAnimationFrame` for smooth animations and transitions.
+            - Visualization MUST be fluid (e.g., bars sliding, nodes pulsing, pointers moving smoothly).
+            - If visualizing data (like an array), animate the changes (swaps, updates) using a timeline/state approach.
+            
+            Dynamic User Input & Controls:
+            - Provide a sophisticated Control Panel at the bottom.
+            - Include a [Data Input] field where users can provide custom data (e.g., "5, 2, 8, 1, 9").
+            - Include a [Generate] button to update the visualization with the custom data instantly.
+            - Include [Play/Pause], [Step Forward], [Step Back], and [Reset] buttons.
+            - Include a [Speed Slider] to control animation velocity in real-time.
+            - The visualization MUST react to these inputs immediately without reloading.
+            
+            Implementation Details:
+            - Implement the core algorithm in JavaScript.
+            - Capture "snapshots" of the algorithm's state at each step.
+            - Provide a clear [Step Explanation] area that updates as the algorithm progresses.
+            - Use Vanilla JS, HTML5 Canvas, or D3.js (via CDN: https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js).
+            - Ensure the code is robust and handles invalid user input gracefully.
             
             Structure:
-            - Header: Title and Status
-            - Main: Visualization Canvas (centered, large)
-            - Footer: Controls and Inputs
+            - Header: Title and Algorithm Type.
+            - Sidebar/Top: Step explanation and current state variables.
+            - Main: Large, centered animation area.
+            - Footer: Fixed control panel with inputs and playback controls.
             """
             
             messages = [
